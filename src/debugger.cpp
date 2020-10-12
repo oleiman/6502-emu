@@ -70,7 +70,7 @@ uint16_t Debugger::extract_addr(string const &command) {
   return stoi(addr_s, nullptr, 16);
 }
 
-bool BreakPoint::shouldBreak(Instruction const &in) {
+bool BreakPoint::shouldBreak(Instruction const &in) const {
   if (in.pc() == pc_) {
     return true;
   }

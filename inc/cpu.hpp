@@ -84,7 +84,7 @@ public:
   }
 
   void initPc(uint16_t val) { state_.pc = val; }
-  uint16_t pc() { return state_.pc; }
+  uint16_t pc() const { return state_.pc; }
 
   template <class Debugger> void debugStep(Debugger &debugger) {
     uint8_t opcode = readByte(state_.pc);

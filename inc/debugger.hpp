@@ -31,7 +31,7 @@ class BreakPoint {
 public:
   explicit BreakPoint(uint16_t pc) : pc_(pc) {}
 
-  bool shouldBreak(instr::Instruction const &in);
+  bool shouldBreak(instr::Instruction const &in) const;
 
 private:
   uint16_t pc_;
