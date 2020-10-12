@@ -31,23 +31,24 @@ private:
 
 template <int size, typename AddressWidth, typename DataWidth> class Ram {
 public:
-  explicit Ram(std::shared_ptr<Bus<AddressWidth>> abus,
-               std::shared_ptr<Bus<DataWidth>> mbus)
-      : address_bus_(abus), memory_bus_(mbus) {
-    memory_bus_->setPutCallback(
+  explicit Ram() {
+    data_bus_.setPutCallback(
         std::bind(&Ram::write, this, std::placeholders::_1));
-    memory_bus_->setGetCallback(std::bind(&Ram::read, this));
+    data_bus_.setGetCallback(std::bind(&Ram::read, this));
   }
   ~Ram() = default;
   uint32_t capacity() { return buffer_.size(); }
 
+  Bus<AddressWidth> &addressBus() { return address_bus_; }
+  Bus<DataWidth> &dataBus() { return data_bus_; }
+
 private:
   std::array<uint8_t, std::min(size, MAX_MEM_SIZE)> buffer_;
-  std::shared_ptr<Bus<AddressWidth>> address_bus_;
-  std::shared_ptr<Bus<DataWidth>> memory_bus_;
+  Bus<AddressWidth> address_bus_;
+  Bus<DataWidth> data_bus_;
 
   DataWidth read() {
-    AddressWidth addr = address_bus_->get();
+    AddressWidth addr = address_bus_.get();
     if (addr < buffer_.size()) {
       return buffer_[addr];
     } else {
@@ -59,7 +60,7 @@ private:
   }
 
   void write(DataWidth data) {
-    AddressWidth addr = address_bus_->get();
+    AddressWidth addr = address_bus_.get();
     if (addr < buffer_.size()) {
       buffer_[addr] = data;
     } else {

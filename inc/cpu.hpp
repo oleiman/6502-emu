@@ -58,14 +58,10 @@ struct State {
 
 template <typename Debugger> class Cpu {
 public:
-  explicit Cpu(std::shared_ptr<mem::Bus<uint16_t>> abus,
-               std::shared_ptr<mem::Bus<uint8_t>> mbus,
+  // TODO(oren): do away with this awful pointer to Debugger
+  explicit Cpu(mem::Bus<uint16_t> &abus, mem::Bus<uint8_t> &mbus,
                std::shared_ptr<Debugger> debug = nullptr)
-      : _address_bus(abus), _memory_bus(mbus), _debugger(debug) {
-    if (abus == nullptr || mbus == nullptr) {
-      throw std::runtime_error("Invalid Bus: NULL");
-    }
-  }
+      : address_bus_(abus), data_bus_(mbus), debugger_(debug) {}
   ~Cpu() = default;
 
   bool loadRomFromFile(const std::string &fname, uint16_t start) {
@@ -88,38 +84,38 @@ public:
     return true;
   }
 
-  void initPc(uint16_t val) { _state.pc = val; }
-  uint16_t pc() { return _state.pc; }
+  void initPc(uint16_t val) { state_.pc = val; }
+  uint16_t pc() { return state_.pc; }
 
   void step() {
-    uint8_t opcode = readByte(_state.pc);
+    uint8_t opcode = readByte(state_.pc);
     instr::Instruction in(
-        opcode, _state.pc,
+        opcode, state_.pc,
         std::bind(&Cpu::memoryAddress, this, std::placeholders::_1));
 
     // TODO(oren): code smell...null check on every iteration
-    if (_debugger) {
-      _debugger->step(in, _state);
+    if (debugger_) {
+      debugger_->step(in, state_, address_bus_, data_bus_);
     }
-    _state.pc += in.size();
+    state_.pc += in.size();
     dispatch(in);
   }
 
 private:
-  State _state;
+  State state_;
 
-  std::shared_ptr<mem::Bus<uint16_t>> _address_bus;
-  std::shared_ptr<mem::Bus<uint8_t>> _memory_bus;
-  std::shared_ptr<Debugger> _debugger;
+  mem::Bus<uint16_t> &address_bus_;
+  mem::Bus<uint8_t> &data_bus_;
+  std::shared_ptr<Debugger> debugger_;
 
   uint8_t readByte(uint16_t addr) {
-    _address_bus->put(addr);
-    return _memory_bus->get();
+    address_bus_.put(addr);
+    return data_bus_.get();
   }
 
   void writeByte(uint16_t addr, uint8_t data) {
-    _address_bus->put(addr);
-    _memory_bus->put(data);
+    address_bus_.put(addr);
+    data_bus_.put(data);
   }
 
   uint16_t memoryAddress(instr::AddressMode mode) {
@@ -159,22 +155,22 @@ private:
     using instr::Operation;
     switch (in.operation()) {
     case Operation::loadA:
-      op_LD(_state.rA, in.address());
+      op_LD(state_.rA, in.address());
       break;
     case Operation::loadX:
-      op_LD(_state.rX, in.address());
+      op_LD(state_.rX, in.address());
       break;
     case Operation::loadY:
-      op_LD(_state.rY, in.address());
+      op_LD(state_.rY, in.address());
       break;
     case Operation::storeA:
-      op_ST(in.address(), _state.rA);
+      op_ST(in.address(), state_.rA);
       break;
     case Operation::storeX:
-      op_ST(in.address(), _state.rX);
+      op_ST(in.address(), state_.rX);
       break;
     case Operation::storeY:
-      op_ST(in.address(), _state.rY);
+      op_ST(in.address(), state_.rY);
       break;
     case Operation::add:
       op_ADC(in.address());
@@ -186,43 +182,43 @@ private:
       op_INC(in.address(), 1);
       break;
     case Operation::incrementX:
-      op_INR(_state.rX, 1);
+      op_INR(state_.rX, 1);
       break;
     case Operation::incrementY:
-      op_INR(_state.rY, 1);
+      op_INR(state_.rY, 1);
       break;
     case Operation::decrement:
       op_INC(in.address(), -1);
       break;
     case Operation::decrementX:
-      op_INR(_state.rX, -1);
+      op_INR(state_.rX, -1);
       break;
     case Operation::decrementY:
-      op_INR(_state.rY, -1);
+      op_INR(state_.rY, -1);
       break;
     case Operation::shiftL:
       op_ASL(in.address());
       break;
     case Operation::shiftLA:
-      op_ASLV(_state.rA);
+      op_ASLV(state_.rA);
       break;
     case Operation::shiftR:
       op_LSR(in.address());
       break;
     case Operation::shiftRA:
-      op_LSRV(_state.rA);
+      op_LSRV(state_.rA);
       break;
     case Operation::rotateL:
       op_ROL(in.address());
       break;
     case Operation::rotateLA:
-      op_ROLV(_state.rA);
+      op_ROLV(state_.rA);
       break;
     case Operation::rotateR:
       op_ROR(in.address());
       break;
     case Operation::rotateRA:
-      op_RORV(_state.rA);
+      op_RORV(state_.rA);
       break;
     case Operation::bwAND:
       op_AND(in.address());
@@ -234,13 +230,13 @@ private:
       op_EOR(in.address());
       break;
     case Operation::compare:
-      op_CMP(_state.rA, in.address());
+      op_CMP(state_.rA, in.address());
       break;
     case Operation::compareX:
-      op_CMP(_state.rX, in.address());
+      op_CMP(state_.rX, in.address());
       break;
     case Operation::compareY:
-      op_CMP(_state.rY, in.address());
+      op_CMP(state_.rY, in.address());
       break;
     case Operation::bitTest:
       op_BIT(in.address());
@@ -270,22 +266,22 @@ private:
       op_BRSet(ZERO_M, in.address());
       break;
     case Operation::transferAX:
-      op_XFER(_state.rA, _state.rX);
+      op_XFER(state_.rA, state_.rX);
       break;
     case Operation::transferAY:
-      op_XFER(_state.rA, _state.rY);
+      op_XFER(state_.rA, state_.rY);
       break;
     case Operation::transferSX:
-      op_XFER(_state.sp, _state.rX);
+      op_XFER(state_.sp, state_.rX);
       break;
     case Operation::transferXA:
-      op_XFER(_state.rX, _state.rA);
+      op_XFER(state_.rX, state_.rA);
       break;
     case Operation::transferXS:
-      op_XFER(_state.rX, _state.sp);
+      op_XFER(state_.rX, state_.sp);
       break;
     case Operation::transferYA:
-      op_XFER(_state.rY, _state.rA);
+      op_XFER(state_.rY, state_.rA);
       break;
     case Operation::jump:
       op_JMP(in.address());
@@ -300,10 +296,10 @@ private:
       op_RTI();
       break;
     case Operation::pushA:
-      op_PUSH(_state.rA);
+      op_PUSH(state_.rA);
       break;
     case Operation::pullA:
-      op_PULL(_state.rA);
+      op_PULL(state_.rA);
       break;
     case Operation::pushS:
       op_PHP();
@@ -315,25 +311,25 @@ private:
       op_BRK();
       break;
     case Operation::clearC:
-      CLEAR(_state.status, CARRY_M);
+      CLEAR(state_.status, CARRY_M);
       break;
     case Operation::clearI:
-      CLEAR(_state.status, INT_DISABLE_M);
+      CLEAR(state_.status, INT_DISABLE_M);
       break;
     case Operation::clearV:
-      CLEAR(_state.status, OVERFLOW_M);
+      CLEAR(state_.status, OVERFLOW_M);
       break;
     case Operation::clearD:
-      CLEAR(_state.status, DECIMAL_M);
+      CLEAR(state_.status, DECIMAL_M);
       break;
     case Operation::setC:
-      SET(_state.status, CARRY_M);
+      SET(state_.status, CARRY_M);
       break;
     case Operation::setI:
-      SET(_state.status, INT_DISABLE_M);
+      SET(state_.status, INT_DISABLE_M);
       break;
     case Operation::setD:
-      SET(_state.status, DECIMAL_M);
+      SET(state_.status, DECIMAL_M);
       break;
     case Operation::nop:
       // no operation
@@ -370,8 +366,8 @@ private:
     // uint8_t input_carry = GET(_state.status, CARRY_M);
     uint16_t result = 0;
 
-    if (GET(_state.status, DECIMAL_M)) {
-      uint8_t accum_dec = ((_state.rA & 0xF0) >> 4) * 10 + _state.rA & 0x0F;
+    if (GET(state_.status, DECIMAL_M)) {
+      uint8_t accum_dec = ((state_.rA & 0xF0) >> 4) * 10 + state_.rA & 0x0F;
       uint8_t addend_dec = ((addend & 0xF0) >> 4) * 10 + addend & 0x0F;
 
       if (accum_dec > 99 || addend_dec > 99) {
@@ -383,9 +379,9 @@ private:
       setOrClearStatus(result == 0, ZERO_M);
       setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
     } else {
-      result = static_cast<uint16_t>(_state.rA);
+      result = static_cast<uint16_t>(state_.rA);
       result += static_cast<uint16_t>(addend);
-      result += GET(_state.status, CARRY_M);
+      result += GET(state_.status, CARRY_M);
       setOrClearStatus(result & 0xFF00, CARRY_M);
 
       // mask off the carry
@@ -394,14 +390,14 @@ private:
       setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
       setOrClearStatus(result == 0, ZERO_M);
 
-      if (GET(_state.rA, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
-          GET(_state.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
-        SET(_state.status, OVERFLOW_M);
+      if (GET(state_.rA, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
+          GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
+        SET(state_.status, OVERFLOW_M);
       } else {
-        CLEAR(_state.status, OVERFLOW_M);
+        CLEAR(state_.status, OVERFLOW_M);
       }
     }
-    _state.rA = static_cast<uint8_t>(result);
+    state_.rA = static_cast<uint8_t>(result);
   }
 
   // subtract memory from accumulator with borrow
@@ -412,12 +408,12 @@ private:
     // uint8_t input_carry = GET(_state.status, CARRY_M);
     uint16_t result = 0;
 
-    if (GET(_state.status, DECIMAL_M)) {
-      uint8_t accum_dec = ((_state.rA & 0xF0) >> 4) * 10 + _state.rA & 0x0F;
+    if (GET(state_.status, DECIMAL_M)) {
+      uint8_t accum_dec = ((state_.rA & 0xF0) >> 4) * 10 + state_.rA & 0x0F;
       uint8_t subtrahend_dec =
           ((subtrahend & 0xF0) >> 4) * 10 + subtrahend & 0x0F;
 
-      subtrahend_dec -= GET(_state.status, CARRY_M) ? 0 : 1;
+      subtrahend_dec -= GET(state_.status, CARRY_M) ? 0 : 1;
 
       if (accum_dec > 99 || subtrahend_dec > 99) {
         return;
@@ -431,22 +427,22 @@ private:
       }
       result = ((accum_dec / 10) << 4) | (accum_dec % 10);
     } else {
-      uint8_t complement = ~subtrahend + GET(_state.status, CARRY_M);
-      result = static_cast<uint16_t>(_state.rA);
+      uint8_t complement = ~subtrahend + GET(state_.status, CARRY_M);
+      result = static_cast<uint16_t>(state_.rA);
       result += complement;
       setOrClearStatus(result & 0xFF00, CARRY_M);
       // mask off the carry
       result &= 0xFF;
       setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
       setOrClearStatus(result == 0, ZERO_M);
-      if (GET(_state.rA, NEGATIVE_M) != GET(subtrahend, NEGATIVE_M) &&
-          GET(_state.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
-        SET(_state.status, OVERFLOW_M);
+      if (GET(state_.rA, NEGATIVE_M) != GET(subtrahend, NEGATIVE_M) &&
+          GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
+        SET(state_.status, OVERFLOW_M);
       } else {
-        CLEAR(_state.status, OVERFLOW_M);
+        CLEAR(state_.status, OVERFLOW_M);
       }
     }
-    _state.rA = static_cast<uint8_t>(result);
+    state_.rA = static_cast<uint8_t>(result);
   }
 
   // increment memory
@@ -503,7 +499,7 @@ private:
 
   // rotate left on value
   void op_ROLV(uint8_t &val) {
-    uint8_t input_carry = GET(_state.status, CARRY_M);
+    uint8_t input_carry = GET(state_.status, CARRY_M);
     setOrClearStatus(GET(val, NEGATIVE_M), CARRY_M);
     val <<= 1;
     if (input_carry) {
@@ -521,7 +517,7 @@ private:
   }
 
   void op_RORV(uint8_t &val) {
-    uint8_t input_carry = GET(_state.status, CARRY_M);
+    uint8_t input_carry = GET(state_.status, CARRY_M);
     setOrClearStatus(GET(val, CARRY_M), CARRY_M);
     val >>= 1;
     if (input_carry) {
@@ -533,46 +529,46 @@ private:
 
   // AND memory with accumulator
   void op_AND(uint16_t source) {
-    _state.rA &= readByte(source);
-    setOrClearStatus(GET(_state.rA, NEGATIVE_M), NEGATIVE_M);
-    setOrClearStatus(_state.rA == 0, ZERO_M);
+    state_.rA &= readByte(source);
+    setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
+    setOrClearStatus(state_.rA == 0, ZERO_M);
   }
 
   // OR memory with accumulator
   void op_ORA(uint16_t source) {
-    _state.rA |= readByte(source);
-    setOrClearStatus(GET(_state.rA, NEGATIVE_M), NEGATIVE_M);
-    setOrClearStatus(_state.rA == 0, ZERO_M);
+    state_.rA |= readByte(source);
+    setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
+    setOrClearStatus(state_.rA == 0, ZERO_M);
   }
 
   // XOR memory with accumulator
   void op_EOR(uint16_t source) {
-    _state.rA ^= readByte(source);
-    setOrClearStatus(GET(_state.rA, NEGATIVE_M), NEGATIVE_M);
-    setOrClearStatus(_state.rA == 0, ZERO_M);
+    state_.rA ^= readByte(source);
+    setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
+    setOrClearStatus(state_.rA == 0, ZERO_M);
   }
 
   // compare memory and register
   void op_CMP(uint8_t reg, uint16_t source) {
     uint8_t val = readByte(source);
     if (reg < val) {
-      SET(_state.status, NEGATIVE_M);
-      CLEAR(_state.status, ZERO_M);
-      CLEAR(_state.status, CARRY_M);
+      SET(state_.status, NEGATIVE_M);
+      CLEAR(state_.status, ZERO_M);
+      CLEAR(state_.status, CARRY_M);
     } else if (reg == val) {
-      CLEAR(_state.status, NEGATIVE_M);
-      SET(_state.status, ZERO_M);
-      SET(_state.status, CARRY_M);
+      CLEAR(state_.status, NEGATIVE_M);
+      SET(state_.status, ZERO_M);
+      SET(state_.status, CARRY_M);
     } else if (reg > val) {
-      CLEAR(_state.status, NEGATIVE_M);
-      CLEAR(_state.status, ZERO_M);
-      SET(_state.status, CARRY_M);
+      CLEAR(state_.status, NEGATIVE_M);
+      CLEAR(state_.status, ZERO_M);
+      SET(state_.status, CARRY_M);
     }
   }
 
   // test bits in memory with accumulator
   void op_BIT(uint16_t source) {
-    uint8_t acc = _state.rA;
+    uint8_t acc = state_.rA;
     uint8_t mem = readByte(source);
     setOrClearStatus(GET(mem, NEGATIVE_M), NEGATIVE_M);
     setOrClearStatus(GET(mem, OVERFLOW_M), OVERFLOW_M);
@@ -581,15 +577,15 @@ private:
 
   // branch if flag is clear
   void op_BRClear(uint8_t flag, uint16_t target) {
-    if (GET(_state.status, flag) == 0) {
-      _state.pc = target;
+    if (GET(state_.status, flag) == 0) {
+      state_.pc = target;
     }
   }
 
   // branch if flag is set
   void op_BRSet(uint8_t flag, uint16_t target) {
-    if (GET(_state.status, flag)) {
-      _state.pc = target;
+    if (GET(state_.status, flag)) {
+      state_.pc = target;
     }
   }
 
@@ -602,14 +598,14 @@ private:
 
   // push value onto stack
   void op_PUSH(uint8_t source) {
-    writeByte(STACK_POINTER(_state.sp), source);
-    _state.sp--;
+    writeByte(STACK_POINTER(state_.sp), source);
+    state_.sp--;
   }
 
   // pop from the stack into dest
   void op_PULL(uint8_t &dest) {
-    _state.sp++;
-    dest = readByte(STACK_POINTER(_state.sp));
+    state_.sp++;
+    dest = readByte(STACK_POINTER(state_.sp));
     setOrClearStatus(GET(dest, NEGATIVE_M), NEGATIVE_M);
     setOrClearStatus(dest == 0, ZERO_M);
   }
@@ -620,75 +616,75 @@ private:
     if (sr) {
       // note that we push the pc of the last byte of the
       // jump instruction
-      uint16_t returnAddr = _state.pc - 1;
+      uint16_t returnAddr = state_.pc - 1;
       uint8_t pc_hi = (returnAddr >> 8) & 0xFF;
       uint8_t pc_lo = returnAddr & 0xFF;
       op_PUSH(pc_hi);
       op_PUSH(pc_lo);
     }
-    _state.pc = target;
+    state_.pc = target;
   }
 
   // return from subroutine
   void op_RTS() {
-    _state.sp++;
-    uint8_t target_lo = readByte(STACK_POINTER(_state.sp++));
+    state_.sp++;
+    uint8_t target_lo = readByte(STACK_POINTER(state_.sp++));
     uint16_t target_hi =
-        static_cast<uint16_t>(readByte(STACK_POINTER(_state.sp)));
-    _state.pc = (target_hi << 8) | target_lo;
-    _state.pc++;
+        static_cast<uint16_t>(readByte(STACK_POINTER(state_.sp)));
+    state_.pc = (target_hi << 8) | target_lo;
+    state_.pc++;
   }
 
   // return from interrupt
   void op_RTI() {
-    _state.sp++;
-    _state.status = readByte(STACK_POINTER(_state.sp++));
-    uint8_t target_lo = readByte(STACK_POINTER(_state.sp++));
+    state_.sp++;
+    state_.status = readByte(STACK_POINTER(state_.sp++));
+    uint8_t target_lo = readByte(STACK_POINTER(state_.sp++));
     uint16_t target_hi =
-        static_cast<uint16_t>(readByte(STACK_POINTER(_state.sp)));
+        static_cast<uint16_t>(readByte(STACK_POINTER(state_.sp)));
 
-    _state.pc = (target_hi << 8) | target_lo;
+    state_.pc = (target_hi << 8) | target_lo;
     // no pc increment here
   }
 
   void op_PHP() {
-    uint8_t tmp = _state.status;
+    uint8_t tmp = state_.status;
     SET(tmp, BIT5_M);
     SET(tmp, BIT4_M);
     op_PUSH(tmp);
   }
 
   void op_PLP() {
-    uint8_t tmp = readByte(STACK_POINTER(++_state.sp));
+    uint8_t tmp = readByte(STACK_POINTER(++state_.sp));
     // ignore the "B Flag"
     CLEAR(tmp, BIT5_M);
     CLEAR(tmp, BIT4_M);
-    _state.status = tmp;
+    state_.status = tmp;
   }
 
   // force interrupt
   void op_BRK() {
-    uint16_t returnAddr = _state.pc + 2;
+    uint16_t returnAddr = state_.pc + 2;
     uint8_t pc_hi = (returnAddr >> 8) & 0xFF;
     uint8_t pc_lo = returnAddr & 0xFF;
     op_PUSH(pc_hi);
     op_PUSH(pc_lo);
 
-    uint8_t tmp = _state.status;
+    uint8_t tmp = state_.status;
     SET(tmp, BIT5_M);
     SET(tmp, BIT4_M);
     op_PUSH(tmp);
 
     uint8_t target_lo = readByte(BRK_VEC);
     uint16_t target_hi = static_cast<uint16_t>(readByte(BRK_VEC + 1));
-    _state.pc = (target_hi << 8) | target_lo;
+    state_.pc = (target_hi << 8) | target_lo;
   }
 
   void setOrClearStatus(bool pred, uint8_t mask) {
     if (pred) {
-      SET(_state.status, mask);
+      SET(state_.status, mask);
     } else {
-      CLEAR(_state.status, mask);
+      CLEAR(state_.status, mask);
     }
   }
 
@@ -697,7 +693,7 @@ private:
     return 0;
   }
 
-  uint16_t addr_Immediate() { return _state.pc + 1; }
+  uint16_t addr_Immediate() { return state_.pc + 1; }
 
   uint16_t addr_Implicit() {
     // not used
@@ -705,28 +701,28 @@ private:
   }
 
   uint16_t addr_Absolute() {
-    uint8_t addr_lo = readByte(_state.pc + 1);
-    uint16_t addr_hi = static_cast<uint16_t>(readByte(_state.pc + 2));
+    uint8_t addr_lo = readByte(state_.pc + 1);
+    uint16_t addr_hi = static_cast<uint16_t>(readByte(state_.pc + 2));
 
     return (addr_hi << 8) | addr_lo;
   }
 
   uint16_t addr_ZeroPage() {
-    uint16_t addr = static_cast<uint16_t>(readByte(_state.pc + 1));
+    uint16_t addr = static_cast<uint16_t>(readByte(state_.pc + 1));
     return addr;
   }
 
   uint16_t addr_Relative() {
-    int8_t offset = static_cast<int8_t>(readByte(_state.pc + 1));
+    int8_t offset = static_cast<int8_t>(readByte(state_.pc + 1));
     ;
-    uint16_t addr = _state.pc + 2 + offset;
+    uint16_t addr = state_.pc + 2 + offset;
 
     return addr;
   }
 
   uint16_t addr_Indirect() {
-    uint8_t i_addr_lo = readByte(_state.pc + 1);
-    uint16_t i_addr_hi = static_cast<uint16_t>(readByte(_state.pc + 2));
+    uint8_t i_addr_lo = readByte(state_.pc + 1);
+    uint16_t i_addr_hi = static_cast<uint16_t>(readByte(state_.pc + 2));
     uint16_t i_addr = (i_addr_hi << 8) | i_addr_lo;
 
     uint8_t addr_lo = readByte(i_addr++);
@@ -736,40 +732,40 @@ private:
   }
 
   uint16_t addr_AbsoluteX() {
-    uint8_t addr_lo = readByte(_state.pc + 1);
-    uint16_t addr_hi = static_cast<uint16_t>(readByte(_state.pc + 2));
+    uint8_t addr_lo = readByte(state_.pc + 1);
+    uint16_t addr_hi = static_cast<uint16_t>(readByte(state_.pc + 2));
 
     uint16_t addr = (addr_hi << 8) | addr_lo;
-    addr += _state.rX;
+    addr += state_.rX;
 
     return addr;
   }
 
   uint16_t addr_AbsoluteY() {
-    uint8_t addr_lo = readByte(_state.pc + 1);
-    uint16_t addr_hi = static_cast<uint16_t>(readByte(_state.pc + 2));
+    uint8_t addr_lo = readByte(state_.pc + 1);
+    uint16_t addr_hi = static_cast<uint16_t>(readByte(state_.pc + 2));
 
     uint16_t addr = (addr_hi << 8) | addr_lo;
-    addr += _state.rY;
+    addr += state_.rY;
 
     return addr;
   }
 
   uint16_t addr_ZeroPageX() {
-    uint8_t addr = readByte(_state.pc + 1);
-    addr += _state.rX;
+    uint8_t addr = readByte(state_.pc + 1);
+    addr += state_.rX;
     return static_cast<uint16_t>(addr);
   }
 
   uint16_t addr_ZeroPageY() {
-    uint8_t addr = readByte(_state.pc + 1);
-    addr += _state.rY;
+    uint8_t addr = readByte(state_.pc + 1);
+    addr += state_.rY;
     return static_cast<uint16_t>(addr);
   }
 
   uint16_t addr_IndexedIndirect() {
     uint16_t zp_addr =
-        static_cast<uint16_t>(readByte(_state.pc + 1)) + _state.rX;
+        static_cast<uint16_t>(readByte(state_.pc + 1)) + state_.rX;
     uint8_t addr_lo = readByte(zp_addr++);
     uint16_t addr_hi = static_cast<uint16_t>(readByte(zp_addr));
 
@@ -779,11 +775,11 @@ private:
   }
 
   uint16_t addr_IndirectIndexed() {
-    uint16_t zp_addr = static_cast<uint16_t>(readByte(_state.pc + 1));
+    uint16_t zp_addr = static_cast<uint16_t>(readByte(state_.pc + 1));
 
     uint8_t addr_lo = readByte(zp_addr++);
     uint16_t addr_hi = static_cast<uint16_t>(readByte(zp_addr));
-    uint16_t addr = ((addr_hi << 8) | addr_lo) + _state.rY;
+    uint16_t addr = ((addr_hi << 8) | addr_lo) + state_.rY;
 
     return addr;
   }

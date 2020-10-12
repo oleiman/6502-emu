@@ -94,25 +94,25 @@ public:
                        std::function<uint16_t(AddressMode)> calcAddr);
   ~Instruction() = default;
 
-  Operation operation() const { return _op; }
-  AddressMode addressMode() const { return _addr_mode; }
-  uint8_t size() const { return _size; }
-  uint8_t opcode() const { return _opcode; }
-  uint16_t address() const { return _address; }
-  uint16_t pc() const { return _pc; }
+  Operation operation() const { return operation_; }
+  AddressMode addressMode() const { return address_mode_; }
+  uint8_t size() const { return size_; }
+  uint8_t opcode() const { return opcode_; }
+  uint16_t address() const { return address_; }
+  uint16_t pc() const { return pc_; }
 
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
 private:
-  uint8_t _opcode;
-  uint8_t _size;
-  AddressMode _addr_mode;
-  Operation _op;
-  uint16_t _pc;
-  uint16_t _address;
+  uint8_t opcode_;
+  uint8_t size_;
+  AddressMode address_mode_;
+  Operation operation_;
+  uint16_t pc_;
+  uint16_t address_;
 
-  void decodeAMode();
-  void decodeOp();
+  void decodeAddressMode();
+  void decodeOperation();
 };
 
 } // namespace instr

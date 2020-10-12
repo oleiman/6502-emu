@@ -21,46 +21,46 @@ using std::stoi;
 using std::string;
 
 namespace dbg {
-Debugger::Debugger(std::shared_ptr<mem::Bus<uint16_t>> abus,
-                   std::shared_ptr<mem::Bus<uint8_t>> mbus, bool brek)
-    : _address_bus(abus), _memory_bus(mbus), _break(brek), _step(false) {}
+Debugger::Debugger(bool should_break) : break_(should_break), step_(false) {}
 
-void Debugger::step(Instruction const &in, State const &state) {
-  _step = false;
-  _break =
-      _break || any_of(_breakpoints.begin(), _breakpoints.end(),
+void Debugger::step(Instruction const &in, State const &state,
+                    mem::Bus<uint16_t> &address_bus,
+                    mem::Bus<uint8_t> &data_bus) {
+  step_ = false;
+  break_ =
+      break_ || any_of(breakpoints_.begin(), breakpoints_.end(),
                        [&in](BreakPoint bp) { return bp.shouldBreak(in); });
 
-  while (_break && !_step) {
+  while (break_ && !step_) {
     string command;
     cout << "> ";
     getline(cin, command);
     if (command == "run" || command == "continue") {
-      _break = false;
+      break_ = false;
     } else if (command == "where") {
-      if (_prev_in) {
-        cout << *_prev_in << endl;
+      if (prev_in_) {
+        cout << *prev_in_ << endl;
       }
       cout << in << endl;
     } else if (command.find("break") == 0) {
       auto addr = extract_addr(command);
       cout << "setting breakpoint at 0x" << hex << setfill('0') << setw(4)
            << +addr << endl;
-      _breakpoints.emplace_back(addr);
+      breakpoints_.emplace_back(addr);
     } else if (command == "registers") {
       cout << state << endl;
     } else if (command == "step") {
-      _step = true;
+      step_ = true;
     } else if (command.find("examine") == 0) {
       auto addr = extract_addr(command);
-      _address_bus->put(addr);
+      address_bus.put(addr);
       cout << "[" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex
-           << setfill('0') << setw(2) << +_memory_bus->get() << endl;
+           << setfill('0') << setw(2) << +data_bus.get() << endl;
     } else {
       cout << "Unrecognized command: " << command << endl;
     }
   }
-  _prev_in = make_unique<Instruction>(in);
+  prev_in_ = make_unique<Instruction>(in);
 }
 
 uint16_t Debugger::extract_addr(string const &command) {
@@ -71,7 +71,7 @@ uint16_t Debugger::extract_addr(string const &command) {
 }
 
 bool BreakPoint::shouldBreak(Instruction const &in) {
-  if (in.pc() == _pc) {
+  if (in.pc() == pc_) {
     return true;
   }
   return false;

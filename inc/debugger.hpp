@@ -13,30 +13,28 @@ class BreakPoint;
 
 class Debugger {
 public:
-  explicit Debugger(std::shared_ptr<mem::Bus<uint16_t>> abus,
-                    std::shared_ptr<mem::Bus<uint8_t>> mbus, bool brek = false);
+  explicit Debugger(bool should_break = false);
   ~Debugger() = default;
 
-  void step(instr::Instruction const &in, cpu::State const &state);
+  void step(instr::Instruction const &in, cpu::State const &state,
+            mem::Bus<uint16_t> &address_bus, mem::Bus<uint8_t> &data_bus);
 
 private:
-  std::shared_ptr<mem::Bus<uint16_t>> _address_bus;
-  std::shared_ptr<mem::Bus<uint8_t>> _memory_bus;
-  bool _break;
-  bool _step;
-  std::unique_ptr<instr::Instruction> _prev_in;
-  std::vector<BreakPoint> _breakpoints;
+  bool break_;
+  bool step_;
+  std::unique_ptr<instr::Instruction> prev_in_;
+  std::vector<BreakPoint> breakpoints_;
   uint16_t extract_addr(std::string const &command);
 };
 
 class BreakPoint {
 public:
-  explicit BreakPoint(uint16_t pc) : _pc(pc) {}
+  explicit BreakPoint(uint16_t pc) : pc_(pc) {}
 
   bool shouldBreak(instr::Instruction const &in);
 
 private:
-  uint16_t _pc;
+  uint16_t pc_;
 };
 
 } // namespace dbg
