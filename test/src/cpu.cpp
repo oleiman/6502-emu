@@ -33,7 +33,7 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
   // auto debugger = std::make_shared<Debugger>(abus, mbus, true);
   Ram<memory_size, uint16_t, uint8_t> memory;
 
-  Cpu<Debugger> cpu(memory.addressBus(), memory.dataBus());
+  Cpu cpu(memory.addressBus(), memory.dataBus());
 
   // 0x4000 specific to test program from interwebs
   current_path(xstr(SOURCE_DIR));
@@ -48,7 +48,4 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 
   memory.addressBus().put(0x0210);
   REQUIRE(memory.dataBus().get() == 0xff);
-  // std::cout << "[0x0210]:  0x"
-  //           << std::hex << std::setfill('0') << std::setw(2)
-  //           << +mbus->get() << std::endl;
 }

@@ -56,12 +56,11 @@ struct State {
   uint8_t status; // Status Regiser
 };
 
-template <typename Debugger> class Cpu {
+class Cpu {
 public:
   // TODO(oren): do away with this awful pointer to Debugger
-  explicit Cpu(mem::Bus<uint16_t> &abus, mem::Bus<uint8_t> &mbus,
-               std::shared_ptr<Debugger> debug = nullptr)
-      : address_bus_(abus), data_bus_(mbus), debugger_(debug) {}
+  explicit Cpu(mem::Bus<uint16_t> &abus, mem::Bus<uint8_t> &mbus)
+      : address_bus_(abus), data_bus_(mbus) {}
   ~Cpu() = default;
 
   bool loadRomFromFile(const std::string &fname, uint16_t start) {
@@ -87,16 +86,24 @@ public:
   void initPc(uint16_t val) { state_.pc = val; }
   uint16_t pc() { return state_.pc; }
 
-  void step() {
+  template <class Debugger> void debugStep(Debugger &debugger) {
     uint8_t opcode = readByte(state_.pc);
     instr::Instruction in(
         opcode, state_.pc,
         std::bind(&Cpu::memoryAddress, this, std::placeholders::_1));
 
     // TODO(oren): code smell...null check on every iteration
-    if (debugger_) {
-      debugger_->step(in, state_, address_bus_, data_bus_);
-    }
+    debugger.step(in, state_, address_bus_, data_bus_);
+    state_.pc += in.size();
+    dispatch(in);
+  }
+
+  void step() {
+    uint8_t opcode = readByte(state_.pc);
+    instr::Instruction in(
+        opcode, state_.pc,
+        std::bind(&Cpu::memoryAddress, this, std::placeholders::_1));
+
     state_.pc += in.size();
     dispatch(in);
   }
@@ -106,7 +113,6 @@ private:
 
   mem::Bus<uint16_t> &address_bus_;
   mem::Bus<uint8_t> &data_bus_;
-  std::shared_ptr<Debugger> debugger_;
 
   uint8_t readByte(uint16_t addr) {
     address_bus_.put(addr);
