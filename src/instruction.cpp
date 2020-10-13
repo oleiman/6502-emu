@@ -38,8 +38,8 @@ array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
     "JSR",     "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK", "CLC",
     "CLI",     "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
-Instruction::Instruction(uint8_t opcode, uint16_t pc,
-                         function<uint16_t(AddressMode)> calc_addr)
+Instruction::Instruction(DataT opcode, AddressT pc,
+                         function<AddressT(AddressMode)> calc_addr)
     : opcode_(opcode), size_(1), address_mode_(AddressMode::implicit),
       operation_(Operation::illegal), pc_(pc) {
   decodeAddressMode();
@@ -48,8 +48,8 @@ Instruction::Instruction(uint8_t opcode, uint16_t pc,
 }
 
 void Instruction::decodeAddressMode() {
-  uint8_t lo = opcode_ & 0x0F;
-  uint8_t hi = (opcode_ & 0xF0) >> 4;
+  DataT lo = opcode_ & 0x0F;
+  DataT hi = (opcode_ & 0xF0) >> 4;
 
   switch (lo) {
   case 0x00:

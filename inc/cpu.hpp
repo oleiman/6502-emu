@@ -56,14 +56,16 @@ struct State {
   uint8_t status; // Status Regiser
 };
 
-class Cpu {
+class M6502 {
 public:
+  using AddressT = uint16_t;
+  using DataT = uint8_t;
   // TODO(oren): do away with this awful pointer to Debugger
-  explicit Cpu(mem::Bus<uint16_t> &abus, mem::Bus<uint8_t> &mbus)
+  explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus)
       : address_bus_(abus), data_bus_(mbus) {}
-  ~Cpu() = default;
+  ~M6502() = default;
 
-  bool loadRomFromFile(const std::string &fname, uint16_t start) {
+  bool loadRomFromFile(const std::string &fname, AddressT start) {
     std::ifstream infile(fname, std::ios::binary);
     if (!infile) {
       std::cerr << "Bad File: " << fname << std::endl;
@@ -74,7 +76,7 @@ public:
     while (infile) {
       infile.get(next);
       try {
-        writeByte(static_cast<uint16_t>(curr++), next);
+        writeByte(static_cast<AddressT>(curr++), next);
       } catch (std::runtime_error &e) {
         std::cerr << e.what() << std::endl;
         return false;
@@ -83,14 +85,14 @@ public:
     return true;
   }
 
-  void initPc(uint16_t val) { state_.pc = val; }
-  uint16_t pc() const { return state_.pc; }
+  void initPc(AddressT val) { state_.pc = val; }
+  AddressT pc() const { return state_.pc; }
 
   template <class Debugger> void debugStep(Debugger &debugger) {
-    uint8_t opcode = readByte(state_.pc);
+    DataT opcode = readByte(state_.pc);
     instr::Instruction in(
         opcode, state_.pc,
-        std::bind(&Cpu::memoryAddress, this, std::placeholders::_1));
+        std::bind(&M6502::memoryAddress, this, std::placeholders::_1));
 
     // TODO(oren): code smell...null check on every iteration
     debugger.step(in, state_, address_bus_, data_bus_);
@@ -99,10 +101,10 @@ public:
   }
 
   void step() {
-    uint8_t opcode = readByte(state_.pc);
+    DataT opcode = readByte(state_.pc);
     instr::Instruction in(
         opcode, state_.pc,
-        std::bind(&Cpu::memoryAddress, this, std::placeholders::_1));
+        std::bind(&M6502::memoryAddress, this, std::placeholders::_1));
 
     state_.pc += in.size();
     dispatch(in);
@@ -111,20 +113,20 @@ public:
 private:
   State state_;
 
-  mem::Bus<uint16_t> &address_bus_;
-  mem::Bus<uint8_t> &data_bus_;
+  mem::Bus<AddressT> &address_bus_;
+  mem::Bus<DataT> &data_bus_;
 
-  uint8_t readByte(uint16_t addr) {
+  DataT readByte(AddressT addr) {
     address_bus_.put(addr);
     return data_bus_.get();
   }
 
-  void writeByte(uint16_t addr, uint8_t data) {
+  void writeByte(AddressT addr, DataT data) {
     address_bus_.put(addr);
     data_bus_.put(data);
   }
 
-  uint16_t memoryAddress(instr::AddressMode mode) {
+  AddressT memoryAddress(instr::AddressMode mode) {
     using instr::AddressMode;
     switch (mode) {
     case AddressMode::accumulator:
@@ -346,6 +348,7 @@ private:
     }
   }
 
+  // TODO(oren): clean up numeric types to distinguish addresses from data, etc
   // START HERE
   void op_Illegal(uint8_t opcode) {
     std::cerr << "Illegal Opcode: <0x" << std::hex << std::setfill('0')

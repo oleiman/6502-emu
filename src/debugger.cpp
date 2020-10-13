@@ -24,8 +24,8 @@ namespace dbg {
 Debugger::Debugger(bool should_break) : break_(should_break), step_(false) {}
 
 void Debugger::step(Instruction const &in, State const &state,
-                    mem::Bus<uint16_t> &address_bus,
-                    mem::Bus<uint8_t> &data_bus) {
+                    mem::Bus<AddressT> &address_bus,
+                    mem::Bus<DataT> &data_bus) {
   step_ = false;
   break_ =
       break_ || any_of(breakpoints_.begin(), breakpoints_.end(),
@@ -63,7 +63,7 @@ void Debugger::step(Instruction const &in, State const &state,
   prev_in_ = make_unique<Instruction>(in);
 }
 
-uint16_t Debugger::extract_addr(string const &command) {
+Debugger::AddressT Debugger::extract_addr(string const &command) {
   // TODO(oren): unsafe, consider std::optional
   auto addr_pos = command.find("0x") + 2;
   auto addr_s = command.substr(addr_pos);

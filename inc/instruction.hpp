@@ -89,27 +89,30 @@ enum class Operation {
 };
 
 class Instruction {
+  using AddressT = uint16_t;
+  using DataT = uint8_t;
+
 public:
-  explicit Instruction(uint8_t opcode, uint16_t pc,
-                       std::function<uint16_t(AddressMode)> calcAddr);
+  explicit Instruction(DataT opcode, AddressT pc,
+                       std::function<AddressT(AddressMode)> calcAddr);
   ~Instruction() = default;
 
   Operation operation() const { return operation_; }
   AddressMode addressMode() const { return address_mode_; }
-  uint8_t size() const { return size_; }
-  uint8_t opcode() const { return opcode_; }
-  uint16_t address() const { return address_; }
-  uint16_t pc() const { return pc_; }
+  DataT size() const { return size_; }
+  DataT opcode() const { return opcode_; }
+  AddressT address() const { return address_; }
+  AddressT pc() const { return pc_; }
 
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
 private:
-  uint8_t opcode_;
-  uint8_t size_;
+  DataT opcode_;
+  DataT size_;
   AddressMode address_mode_;
   Operation operation_;
-  uint16_t pc_;
-  uint16_t address_;
+  AddressT pc_;
+  AddressT address_;
 
   void decodeAddressMode();
   void decodeOperation();

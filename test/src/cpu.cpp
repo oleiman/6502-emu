@@ -17,23 +17,15 @@
 using std::make_shared;
 using std::filesystem::current_path;
 
-using cpu::Cpu;
-using dbg::Debugger;
-using mem::Bus;
+using cpu::M6502;
 using mem::Ram;
 
 constexpr int memory_size = 0x10000;
-using ABusWidth = uint16_t;
-using MBusWidth = uint8_t;
-using Memory = Ram<memory_size, ABusWidth, MBusWidth>;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
-  // auto abus = std::make_shared<Bus<ABusWidth>>();
-  // auto mbus = std::make_shared<Bus<MBusWidth>>();
-  // auto debugger = std::make_shared<Debugger>(abus, mbus, true);
-  Ram<memory_size, uint16_t, uint8_t> memory;
+  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
 
-  Cpu cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(memory.addressBus(), memory.dataBus());
 
   // 0x4000 specific to test program from interwebs
   current_path(xstr(SOURCE_DIR));

@@ -29,7 +29,7 @@ private:
   std::function<T(void)> get_callback_ = [this]() { return data_; };
 };
 
-template <int size, typename AddressWidth, typename DataWidth> class Ram {
+template <int size, typename AddressT, typename DataT> class Ram {
 public:
   explicit Ram() {
     data_bus_.setPutCallback(
@@ -39,16 +39,16 @@ public:
   ~Ram() = default;
   uint32_t capacity() { return buffer_.size(); }
 
-  Bus<AddressWidth> &addressBus() { return address_bus_; }
-  Bus<DataWidth> &dataBus() { return data_bus_; }
+  Bus<AddressT> &addressBus() { return address_bus_; }
+  Bus<DataT> &dataBus() { return data_bus_; }
 
 private:
   std::array<uint8_t, std::min(size, MAX_MEM_SIZE)> buffer_;
-  Bus<AddressWidth> address_bus_;
-  Bus<DataWidth> data_bus_;
+  Bus<AddressT> address_bus_;
+  Bus<DataT> data_bus_;
 
-  DataWidth read() {
-    AddressWidth addr = address_bus_.get();
+  DataT read() {
+    AddressT addr = address_bus_.get();
     if (addr < buffer_.size()) {
       return buffer_[addr];
     } else {
@@ -59,8 +59,8 @@ private:
     }
   }
 
-  void write(DataWidth data) {
-    AddressWidth addr = address_bus_.get();
+  void write(DataT data) {
+    AddressT addr = address_bus_.get();
     if (addr < buffer_.size()) {
       buffer_[addr] = data;
     } else {
