@@ -29,7 +29,9 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 
   // 0x4000 specific to test program from interwebs
   current_path(xstr(SOURCE_DIR));
-  REQUIRE(cpu.loadRomFromFile(AllSuitePath, 0x4000));
+  std::ifstream infile(AllSuitePath, std::ios::binary);
+  REQUIRE(cpu.loadRom(infile, 0x4000));
+  infile.close();
   cpu.initPc(0x4000);
 
   while (true) {

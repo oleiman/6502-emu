@@ -38,6 +38,11 @@ array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
     "JSR",     "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK", "CLC",
     "CLI",     "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
+array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
+    "Imp",   "Accum", "Imm", "Abs",   "AbsX",     "AbsY",     "Zero",
+    "ZeroX", "ZeroY", "Rel", "Indir", "IdxIndir", "IndirIdx",
+};
+
 Instruction::Instruction(DataT opcode, AddressT pc,
                          function<AddressT(AddressMode)> calc_addr)
     : opcode_(opcode), size_(1), address_mode_(AddressMode::implicit),
@@ -470,41 +475,9 @@ ostream &operator<<(ostream &os, Instruction const &in) {
   case AddressMode::accumulator:
     ss << "A";
     break;
-  case AddressMode::immediate:
-    ss << "#$" << setw(2) << +static_cast<uint8_t>(in.address_ & 0xFF);
-    break;
-  case AddressMode::absolute:
-    ss << "$" << setw(4) << +in.address_;
-    break;
-  case AddressMode::absoluteX:
-    ss << "$" << setw(4) << +in.address_ << ",X";
-    break;
-  case AddressMode::absoluteY:
-    ss << "$" << setw(4) << +in.address_ << ",Y";
-    break;
-  case AddressMode::zeroPage:
-    ss << "$" << setw(2) << +static_cast<uint8_t>(in.address_ & 0xFF);
-    break;
-  case AddressMode::zeroPageX:
-    ss << "$" << setw(2) << +static_cast<uint8_t>(in.address_ & 0xFF) << ",X";
-    break;
-  case AddressMode::zeroPageY:
-    ss << "$" << setw(2) << +static_cast<uint8_t>(in.address_ & 0xFF) << ",Y";
-    break;
-  case AddressMode::relative:
-    // always interpreted as a signed byte
-    ss << "$" << std::dec << +static_cast<int8_t>(in.address_ & 0xFF);
-    break;
-  case AddressMode::indirect:
-    ss << "($" << setw(4) << +in.address_ << ")";
-    break;
-  case AddressMode::indexedIndirect:
-    ss << "($" << +static_cast<uint8_t>(in.address_ & 0xFF) << ",X)";
-    break;
-  case AddressMode::indirectIndexed:
-    ss << "($" << +static_cast<uint8_t>(in.address_ & 0xFF) << "),Y";
-    break;
   default:
+    ss << "$" << setw(4) << +in.address_ << " ("
+       << aModeMnemonics[static_cast<int>(in.address_mode_)] << ")";
     break;
   }
   os << ss.str();

@@ -37,21 +37,21 @@ void Debugger::step(Instruction const &in, State const &state,
     getline(cin, command);
     if (command == "run" || command == "continue") {
       break_ = false;
-    } else if (command == "where") {
+    } else if (command == "where" || command[0] == 'w') {
       if (prev_in_) {
         cout << *prev_in_ << endl;
       }
       cout << in << endl;
-    } else if (command.find("break") == 0) {
+    } else if (command.find("break") == 0 || command[0] == 'b') {
       auto addr = extract_addr(command);
       cout << "setting breakpoint at 0x" << hex << setfill('0') << setw(4)
            << +addr << endl;
       breakpoints_.emplace_back(addr);
-    } else if (command == "registers") {
+    } else if (command == "registers" || command[0] == 'r') {
       cout << state << endl;
-    } else if (command == "step") {
+    } else if (command == "step" || command[0] == 's') {
       step_ = true;
-    } else if (command.find("examine") == 0) {
+    } else if (command.find("examine") == 0 || command[0] == 'e') {
       auto addr = extract_addr(command);
       address_bus.put(addr);
       cout << "[" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex

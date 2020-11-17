@@ -60,19 +60,20 @@ class M6502 {
 public:
   using AddressT = uint16_t;
   using DataT = uint8_t;
+  using Callback = std::function<void(AddressT)>;
   // TODO(oren): do away with this awful pointer to Debugger
   explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus)
       : address_bus_(abus), data_bus_(mbus) {}
   ~M6502() = default;
 
-  bool loadRomFromFile(const std::string &fname, AddressT start) {
-    std::ifstream infile(fname, std::ios::binary);
+  bool loadRom(std::ifstream &infile, AddressT start) {
+    code_start_ = start;
     if (!infile) {
-      std::cerr << "Bad File: " << fname << std::endl;
+      std::cerr << "Bad ROM File!" << std::endl;
       return false;
     }
     char next;
-    uint32_t curr = start;
+    uint32_t curr = code_start_;
     while (infile) {
       infile.get(next);
       try {
@@ -94,8 +95,10 @@ public:
         opcode, state_.pc,
         std::bind(&M6502::memoryAddress, this, std::placeholders::_1));
 
-    // TODO(oren): code smell...null check on every iteration
     debugger.step(in, state_, address_bus_, data_bus_);
+
+    fireCallbacks(in);
+    // std::cout << in << std::endl;
     state_.pc += in.size();
     dispatch(in);
   }
@@ -105,9 +108,21 @@ public:
     instr::Instruction in(
         opcode, state_.pc,
         std::bind(&M6502::memoryAddress, this, std::placeholders::_1));
-
+    fireCallbacks(in);
     state_.pc += in.size();
     dispatch(in);
+  }
+
+  void registerCallback(instr::Operation op, Callback c) {
+    callbacks_[op].push_back(c);
+  }
+
+  void fireCallbacks(instr::Instruction const &in) {
+    if (callbacks_.count(in.operation()) > 0) {
+      for (auto &c : callbacks_[in.operation()]) {
+        c(in.address());
+      }
+    }
   }
 
 private:
@@ -115,6 +130,9 @@ private:
 
   mem::Bus<AddressT> &address_bus_;
   mem::Bus<DataT> &data_bus_;
+
+  AddressT code_start_;
+  std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;
 
   DataT readByte(AddressT addr) {
     address_bus_.put(addr);
@@ -348,8 +366,8 @@ private:
     }
   }
 
-  // TODO(oren): clean up numeric types to distinguish addresses from data, etc
-  // START HERE
+  // TODO(oren): clean up numeric types to distinguish addresses from data,
+  // etc START HERE
   void op_Illegal(uint8_t opcode) {
     std::cerr << "Illegal Opcode: <0x" << std::hex << std::setfill('0')
               << std::setw(2) << +opcode << ">" << std::endl;
@@ -360,6 +378,7 @@ private:
 
   // load
   void op_LD(uint8_t &dest, uint16_t source) {
+
     dest = readByte(source);
     setOrClearStatus(GET(dest, NEGATIVE_M), NEGATIVE_M);
     setOrClearStatus(dest == 0, ZERO_M);
@@ -702,6 +721,8 @@ private:
     return 0;
   }
 
+  // immediate adressing
+  // read from the very next byte relative to current PC
   uint16_t addr_Immediate() { return state_.pc + 1; }
 
   uint16_t addr_Implicit() {
@@ -737,7 +758,9 @@ private:
     uint8_t addr_lo = readByte(i_addr++);
     uint16_t addr_hi = static_cast<uint16_t>(readByte(i_addr++));
 
-    return (addr_hi << 8) | addr_lo;
+    uint16_t addr = (addr_hi << 8) | addr_lo;
+
+    return addr;
   }
 
   uint16_t addr_AbsoluteX() {
