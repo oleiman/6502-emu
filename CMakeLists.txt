@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long  -pedantic -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
 
 project(6502-emu)
-add_library(6502-emu src/debugger.cpp src/instruction.cpp)
+add_library(6502-emu src/debugger.cpp src/instruction.cpp src/cpu.cpp)
 target_include_directories(6502-emu PUBLIC inc)
 set_property(TARGET 6502-emu PROPERTY CXX_STANDARD 17)
 

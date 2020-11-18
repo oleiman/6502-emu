@@ -1,11 +1,11 @@
 #include "cpu.hpp"
-#include "debugger.hpp"
 #include "instruction.hpp"
 
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <mutex>
 #include <termios.h>
 #include <thread>
@@ -15,11 +15,6 @@
 #define xstr(s) str(s)
 #define str(s) #s
 
-// TODO(oren): need to set input and output vectors!
-// implement cpu::WriteRAM to write between zero page and code
-// store character to F001
-// vector should go in 0x0207
-
 #define CODE_SECTION 0xC000
 
 #define OBUF 0xF001
@@ -28,6 +23,9 @@
 #define VEC_P 0x0205
 uint8_t vec_addr[4] = {0x00, 0xF1, 0x10, 0xF1};
 
+// EhBASIC expects to find system-specific I/O routines *somewhere* in memory
+// We're sticking them in an unused portion of the code section here to
+// guarantee they don't get wiped out at run time.
 #define IO_ROUTINE_P 0xF100
 uint8_t io_routines[20] = {
     // INPUT
@@ -35,7 +33,6 @@ uint8_t io_routines[20] = {
     0xAD, 0x04, 0xF0, // LDA $F004
     0xC9, 0x00,       // CMP #00
     0xF0, 0x07,       // BEQ 0x08
-    // 0x38,          // SEC set carry
     0xA0, 0x00,       // LDY #00
     0x8C, 0x04, 0xF0, // STY $F004
     0xC9, 0x00,       // CMP #00 (Z = 0, C = 1)
@@ -45,16 +42,13 @@ uint8_t io_routines[20] = {
     0x60              // RTS
 };
 
-// #define VEC_IN_P 0x0209
-// uint8_t vec_in[2] = {0x04, 0xB0};
-
 class EhBASIC {
   constexpr static int MemorySize = 0x10000;
 
 public:
   EhBASIC(std::ifstream &romfile)
-      : cpu(memory.addressBus(), memory.dataBus()), debugger(true),
-        input_buffer_(32, '\0'), input_thread_(&EhBASIC::readInput, this) {
+      : cpu(memory.addressBus(), memory.dataBus()), input_buffer_(32, '\0'),
+        input_thread_(&EhBASIC::readInput, this) {
     cpu.registerCallback(
         instr::Operation::loadA,
         std::bind(&EhBASIC::loadCB, this, std::placeholders::_1));
@@ -90,19 +84,13 @@ public:
 
   void run() {
     while (true) {
-      if (should_debug) {
-        cpu.debugStep(debugger);
-      } else {
-        cpu.step();
-      }
+      cpu.step();
     }
   }
 
 private:
   mem::Ram<MemorySize, cpu::M6502::AddressT, cpu::M6502::DataT> memory;
   cpu::M6502 cpu;
-  dbg::Debugger debugger;
-  bool should_debug = false;
   std::vector<char> input_buffer_;
   int buf_read_ = 0;
   int buf_write_ = 0;
@@ -149,7 +137,7 @@ void enableRawMode() {
 
 int main(int argc, char **argv) {
   std::filesystem::current_path(xstr(SOURCE_DIR));
-  std::ifstream romfile("test/rom/ehBASIC/ehbasic_alt.bin", std::ios::binary);
-  EhBASIC basic(romfile);
+  std::ifstream rom("test/rom/ehBASIC/ehbasic_alt.bin", std::ios::binary);
+  EhBASIC basic(rom);
   basic.run();
 }

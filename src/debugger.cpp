@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-using cpu::State;
+using cpu::CpuState;
 using instr::Instruction;
 
 using std::any_of;
@@ -23,7 +23,7 @@ using std::string;
 namespace dbg {
 Debugger::Debugger(bool should_break) : break_(should_break), step_(false) {}
 
-void Debugger::step(Instruction const &in, State const &state,
+void Debugger::step(Instruction const &in, CpuState const &state,
                     mem::Bus<AddressT> &address_bus,
                     mem::Bus<DataT> &data_bus) {
   step_ = false;

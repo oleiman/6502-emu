@@ -21,7 +21,7 @@ public:
   explicit Debugger(bool should_break = false);
   ~Debugger() = default;
 
-  void step(instr::Instruction const &in, cpu::State const &state,
+  void step(instr::Instruction const &in, cpu::CpuState const &state,
             mem::Bus<AddressT> &address_bus, mem::Bus<DataT> &data_bus);
 
 private:

@@ -3,11 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
-#include <iostream>
-#include <memory>
 #include <sstream>
-
-#define MAX_MEM_SIZE 65536
 
 namespace mem {
 
@@ -30,6 +26,8 @@ private:
 };
 
 template <int size, typename AddressT, typename DataT> class Ram {
+  constexpr static int MAX_SIZE = 65536;
+
 public:
   explicit Ram() {
     data_bus_.setPutCallback(
@@ -43,7 +41,7 @@ public:
   Bus<DataT> &dataBus() { return data_bus_; }
 
 private:
-  std::array<uint8_t, std::min(size, MAX_MEM_SIZE)> buffer_;
+  std::array<uint8_t, std::min(size, MAX_SIZE)> buffer_;
   Bus<AddressT> address_bus_;
   Bus<DataT> data_bus_;
 
