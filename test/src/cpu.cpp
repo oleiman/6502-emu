@@ -24,8 +24,10 @@ constexpr int memory_size = 0x10000;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
   Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  int cycles = 0;
+  auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
 
   // 0x4000 specific to test program from interwebs
   current_path(xstr(SOURCE_DIR));
@@ -42,4 +44,37 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 
   memory.addressBus().put(0x0210);
   REQUIRE(memory.dataBus().get() == 0xff);
+
+  std::cerr << cycles << std::endl;
+}
+
+TEST_CASE("KlausFunctional", "[integration][cpu]") {
+  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  int cycles = 0;
+  auto tick = [&cycles]() { ++cycles; };
+
+  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+
+  // 0x400 specific to test program from interwebs
+  current_path(xstr(SOURCE_DIR));
+  std::ifstream infile(KlausFunctionalPath, std::ios::binary);
+  REQUIRE(cpu.loadRom(infile, 0x0000u));
+  infile.close();
+  cpu.initPc(0x400u);
+
+  dbg::Debugger d(true);
+
+  try {
+    do {
+      cpu.debugStep(d);
+      // cpu.step();
+    } while (cpu.pc() != 0x400);
+  } catch (std::runtime_error e) {
+    std::cerr << e.what() << std::endl;
+  }
+
+  // memory.addressBus().put(0x0210);
+  // REQUIRE(memory.dataBus().get() == 0xff);
+
+  std::cerr << cycles << std::endl;
 }
