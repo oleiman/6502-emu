@@ -57,9 +57,6 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
 }
 
 void M6502::step() {
-  // std::stringstream ss;
-  // ss << std::hex << state_.pc << std::endl;
-  // std::cerr << ss.str();
   DataT opcode = readByte(state_.pc);
   instr::Instruction in(
       opcode, state_.pc,
@@ -269,7 +266,8 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_XFER(state_.rX, state_.rA);
     break;
   case Operation::transferXS:
-    op_XFER(state_.rX, state_.sp);
+    op_TXS();
+    // op_XFER(state_.rX, state_.sp);
     break;
   case Operation::transferYA:
     op_XFER(state_.rY, state_.rA);
@@ -607,6 +605,11 @@ void M6502::op_BRSet(uint8_t flag, AddressT target) {
   }
 }
 
+void M6502::op_TXS() {
+  state_.sp = state_.rX;
+  tick_();
+}
+
 // transfer from source to dest
 void M6502::op_XFER(DataT source, DataT &dest) {
   dest = source;
@@ -639,6 +642,8 @@ void M6502::op_PLA() {
 void M6502::op_JSR(AddressT target) {
   // note that we push the pc of the last byte of the
   // jump instruction
+  // NOTE(oren): changed from state_.pc - 1, which wouldn't really make sense,
+  // yeah?
   AddressT returnAddr = state_.pc - 1;
   DataT ra_hi = (returnAddr >> 8) & 0xFF;
   DataT ra_lo = returnAddr & 0xFF;
@@ -674,7 +679,7 @@ void M6502::op_RTI() {
   DataT target_lo = readByte(STACK_POINTER(state_.sp++)); // tick 4
   AddressT target_hi =
       static_cast<AddressT>(readByte(STACK_POINTER(state_.sp))); // tick 5
-  // no pc increment here
+  // no pc increment here, address on stack is precise return address
   op_JMP((target_hi << 8) | target_lo); // tick 6
 }
 
@@ -699,7 +704,8 @@ void M6502::op_PLP() {
 
 // force interrupt
 void M6502::op_BRK() {
-  AddressT returnAddr = state_.pc + 2;
+  // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
+  AddressT returnAddr = state_.pc + 1;
   DataT pc_hi = (returnAddr >> 8) & 0xFF;
   DataT pc_lo = returnAddr & 0xFF;
   op_PUSH(pc_hi); // tick 2
@@ -713,6 +719,7 @@ void M6502::op_BRK() {
   DataT target_lo = readByte(BRK_VEC);                               // tick 5
   AddressT target_hi = static_cast<AddressT>(readByte(BRK_VEC + 1)); // tick 6
   AddressT target = (target_hi << 8) | target_lo;
+  SET(state_.status, INT_DISABLE_M);
   op_JMP(target); // tick 7
 }
 
@@ -764,7 +771,14 @@ M6502::AddressT M6502::addr_ZeroPage() {
 M6502::AddressT M6502::addr_Relative() {
   int8_t offset = static_cast<int8_t>(readByte(state_.pc + 1));
   AddressT base = state_.pc + 2;
-  return penalizedOffset(base, offset);
+  if (offset < 0) {
+    offset = -offset;
+    return base - static_cast<uint8_t>(offset);
+  }
+  return base + offset;
+
+  // TODO(oren): this actually is penalized. Need a way to handle signedness :(
+  // return penalizedOffset(base, offset);
 }
 
 M6502::AddressT M6502::addr_Indirect() {

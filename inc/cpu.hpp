@@ -41,6 +41,9 @@ public:
   void step();
 
   template <class Debugger> void debugStep(Debugger &debugger) {
+    // std::stringstream ss;
+    // ss << std::hex << state_.pc << std::endl;
+    // std::cerr << ss.str();
     DataT opcode = readByte(state_.pc);
     instr::Instruction in(
         opcode, state_.pc,
@@ -102,6 +105,7 @@ private:
   void op_BRClear(uint8_t flag, AddressT target);
   void op_BRSet(uint8_t flag, AddressT target);
   void op_XFER(DataT source, DataT &dest);
+  void op_TXS();
   void op_PHA();
   void op_PUSH(DataT source);
   void op_PLA();
