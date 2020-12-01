@@ -4,7 +4,7 @@ set(CMAKE_CXX_FLAGS
     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR})
 
 project(test)
-add_executable(catch src/cpu.cpp)
+add_executable(catch src/cpu.cpp src/util.cpp)
 target_include_directories(catch PRIVATE inc ../inc)
 set_property(TARGET catch PROPERTY CXX_STANDARD 17)
 
