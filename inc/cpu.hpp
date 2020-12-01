@@ -121,6 +121,7 @@ private:
   void op_NOP();
 
   void setOrClearStatus(bool pred, uint8_t mask);
+  DataT doBinaryAdc(DataT addend);
 
   AddressT addr_Accumulator();
   AddressT addr_Immediate();

@@ -375,38 +375,28 @@ void M6502::op_ADC(AddressT source) {
   DataT addend = readByte(source);
   // TODO(oren): not used? logic error?
   // DataT input_carry = GET(_state.status, CARRY_M);
-  AddressT result = 0;
+  uint16_t result = 0;
 
   if (GET(state_.status, DECIMAL_M)) {
-    DataT accum_dec = ((state_.rA & 0xF0) >> 4) * 10 + state_.rA & 0x0F;
-    DataT addend_dec = ((addend & 0xF0) >> 4) * 10 + addend & 0x0F;
+    DataT accum_hi = (state_.rA & 0xF0) >> 4;
+    DataT accum_lo = state_.rA & 0x0F;
+    DataT accum_dec = accum_hi * 10 + accum_lo;
 
-    if (accum_dec > 99 || addend_dec > 99) {
+    DataT addend_hi = (addend & 0xF0) >> 4;
+    DataT addend_lo = (addend & 0x0F);
+    DataT addend_dec = addend_hi * 10 + addend_lo + GET(state_.status, CARRY_M);
+
+    if (accum_dec > 99 || addend_dec > 100) {
       return;
     }
     accum_dec += addend_dec;
     setOrClearStatus(accum_dec > 99, CARRY_M);
+    accum_dec %= 100;
     result = ((accum_dec / 10) << 4) | (accum_dec % 10);
     setOrClearStatus(result == 0, ZERO_M);
     setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
   } else {
-    result = static_cast<uint16_t>(state_.rA);
-    result += static_cast<uint16_t>(addend);
-    result += GET(state_.status, CARRY_M);
-    setOrClearStatus(result & 0xFF00, CARRY_M);
-
-    // mask off the carry
-    result &= 0xFF;
-
-    setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
-    setOrClearStatus(result == 0, ZERO_M);
-
-    if (GET(state_.rA, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
-        GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
-      SET(state_.status, OVERFLOW_M);
-    } else {
-      CLEAR(state_.status, OVERFLOW_M);
-    }
+    result = doBinaryAdc(addend);
   }
   state_.rA = static_cast<DataT>(result);
 }
@@ -420,12 +410,18 @@ void M6502::op_SBC(AddressT source) {
   uint16_t result = 0;
 
   if (GET(state_.status, DECIMAL_M)) {
-    DataT accum_dec = ((state_.rA & 0xF0) >> 4) * 10 + state_.rA & 0x0F;
-    DataT subtrahend_dec = ((subtrahend & 0xF0) >> 4) * 10 + subtrahend & 0x0F;
 
-    subtrahend_dec -= GET(state_.status, CARRY_M) ? 0 : 1;
+    DataT accum_hi = (state_.rA & 0xF0) >> 4;
+    DataT accum_lo = state_.rA & 0x0F;
+    DataT accum_dec = accum_hi * 10 + accum_lo;
 
-    if (accum_dec > 99 || subtrahend_dec > 99) {
+    DataT subtrahend_hi = (subtrahend & 0xF0) >> 4;
+    DataT subtrahend_lo = (subtrahend & 0x0F);
+    DataT subtrahend_dec = subtrahend_hi * 10 + subtrahend_lo;
+
+    subtrahend_dec += GET(state_.status, CARRY_M) ? 0 : 1;
+
+    if (accum_dec > 99 || subtrahend_dec > 100) {
       return;
     }
 
@@ -437,20 +433,7 @@ void M6502::op_SBC(AddressT source) {
     }
     result = ((accum_dec / 10) << 4) | (accum_dec % 10);
   } else {
-    DataT complement = ~subtrahend + GET(state_.status, CARRY_M);
-    result = static_cast<uint16_t>(state_.rA);
-    result += complement;
-    setOrClearStatus(result & 0xFF00, CARRY_M);
-    // mask off the carry
-    result &= 0xFF;
-    setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
-    setOrClearStatus(result == 0, ZERO_M);
-    if (GET(state_.rA, NEGATIVE_M) != GET(subtrahend, NEGATIVE_M) &&
-        GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
-      SET(state_.status, OVERFLOW_M);
-    } else {
-      CLEAR(state_.status, OVERFLOW_M);
-    }
+    result = doBinaryAdc(~subtrahend);
   }
   state_.rA = static_cast<DataT>(result);
 }
@@ -741,6 +724,28 @@ void M6502::setOrClearStatus(bool pred, uint8_t mask) {
   } else {
     CLEAR(state_.status, mask);
   }
+}
+
+M6502::DataT M6502::doBinaryAdc(DataT addend) {
+  uint16_t result;
+  result = static_cast<uint16_t>(state_.rA);
+  result += static_cast<uint16_t>(addend);
+  result += GET(state_.status, CARRY_M);
+  setOrClearStatus(result & 0xFF00, CARRY_M);
+
+  // mask off the carry
+  result &= 0xFF;
+
+  setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
+  setOrClearStatus(result == 0, ZERO_M);
+
+  if (GET(state_.rA, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
+      GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
+    SET(state_.status, OVERFLOW_M);
+  } else {
+    CLEAR(state_.status, OVERFLOW_M);
+  }
+  return static_cast<DataT>(result);
 }
 
 M6502::AddressT M6502::addr_Implicit() {
