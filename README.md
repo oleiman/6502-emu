@@ -34,9 +34,12 @@ Even still, it's possible to execute simple BASIC commands (e.g. LET a = 23, PRI
 
 This implementation is extremely a work in progress. There are some easy wins coming up as well as some not so easy wins.
 
-Easy:
-- cpu::M6502 is no longer a template class, so its implementation should be separated from its interface.
+TODO:
 
-Harder:
-- cpu:M6502 is not cycle accurate. In fact, it doesn't account for cycle counts at all.
-- Will need to decide on a granularity for stepping AND do some refactoring to accomodate.
+- Very close to cycle accuracy. Certain instructions require some digging.
+- Cycle stepping is done via callback. While not very performant, this should provide enough flexibility to integrate this into a full-system emulation of, say, the NES. The machine itself is still funcamentally stepped by instruction.
+- Add interrupt test.
+- Start thinking about undocumented opcodes.
+- Address calculation should live closer to execution. Currently it happens before "dispatch", which doesn't make sense.
+- Remember: this is not a simulator ;)
+

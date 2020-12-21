@@ -18,7 +18,7 @@ class Debugger {
 public:
   using AddressT = cpu::M6502::AddressT;
   using DataT = cpu::M6502::DataT;
-  explicit Debugger(bool should_break = false);
+  explicit Debugger(bool should_break, bool trace);
   ~Debugger() = default;
 
   void step(instr::Instruction const &in, cpu::CpuState const &state,
@@ -26,7 +26,9 @@ public:
 
 private:
   bool break_;
+  bool trace_;
   bool step_;
+  int iter_;
   std::unique_ptr<instr::Instruction> prev_in_;
   std::vector<BreakPoint> breakpoints_;
   AddressT extract_addr(std::string const &command);

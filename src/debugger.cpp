@@ -21,15 +21,27 @@ using std::stoi;
 using std::string;
 
 namespace dbg {
-Debugger::Debugger(bool should_break) : break_(should_break), step_(false) {}
+Debugger::Debugger(bool should_break, bool trace)
+    : break_(should_break), trace_(trace), step_(false), iter_(0) {}
 
 void Debugger::step(Instruction const &in, CpuState const &state,
                     mem::Bus<AddressT> &address_bus,
                     mem::Bus<DataT> &data_bus) {
+
+  if (step_) {
+    cout << in << endl;
+  }
   step_ = false;
   break_ =
       break_ || any_of(breakpoints_.begin(), breakpoints_.end(),
                        [&in](BreakPoint bp) { return bp.shouldBreak(in); });
+
+  if (trace_ && !break_) {
+    cout << in << endl;
+  } else if (iter_ && break_) {
+    --iter_;
+    break_ = false;
+  }
 
   while (break_ && !step_) {
     string command;
@@ -56,10 +68,18 @@ void Debugger::step(Instruction const &in, CpuState const &state,
       address_bus.put(addr);
       cout << "[" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex
            << setfill('0') << setw(2) << +data_bus.get() << endl;
+    } else if (command.find("trace") == 0 || command[0] == 't') {
+      trace_ = true;
+    } else if (command.find("iter") == 0 || command[0] == 'i') {
+      auto spc = command.find(" ");
+      if (spc != command.npos) {
+        iter_ = atoi(command.substr(spc, command.length()).c_str()) - 1;
+      }
     } else {
       cout << "Unrecognized command: " << command << endl;
     }
   }
+
   prev_in_ = make_unique<Instruction>(in);
 }
 
