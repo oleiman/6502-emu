@@ -41,5 +41,6 @@ TODO:
 - Add interrupt test.
 - Start thinking about undocumented opcodes.
 - Address calculation should live closer to execution. Currently it happens before "dispatch", which doesn't make sense.
+- Address performance issues. Runs at a dozen or two MHz, but it's pretty bad, considering. Memory bus architecture is a likely culprit.
 - Remember: this is not a simulator ;)
 
