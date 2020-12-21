@@ -30,8 +30,9 @@ public:
   using DataT = uint8_t;
   using Callback = std::function<void(AddressT)>;
 
-  explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus)
-      : address_bus_(abus), data_bus_(mbus) {}
+  explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus,
+                 std::function<void(void)> tick)
+      : address_bus_(abus), data_bus_(mbus), tick_(tick) {}
 
   ~M6502() = default;
   bool loadRom(std::ifstream &infile, AddressT start);
@@ -40,6 +41,9 @@ public:
   void step();
 
   template <class Debugger> void debugStep(Debugger &debugger) {
+    // std::stringstream ss;
+    // ss << std::hex << state_.pc << std::endl;
+    // std::cerr << ss.str();
     DataT opcode = readByte(state_.pc);
     instr::Instruction in(
         opcode, state_.pc,
@@ -59,6 +63,7 @@ private:
 
   mem::Bus<AddressT> &address_bus_;
   mem::Bus<DataT> &data_bus_;
+  std::function<void(void)> tick_;
 
   AddressT code_start_;
   std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;
@@ -68,6 +73,10 @@ private:
   void writeByte(AddressT addr, DataT data);
 
   AddressT calculateAddress(instr::AddressMode mode);
+
+  // Compute offset address, tick clock if page boundary crossed
+  AddressT penalizedOffset(AddressT base, uint8_t offset);
+  AddressT wrapAroundOffset(AddressT base, uint8_t offset);
   void dispatch(instr::Instruction const &in);
 
   // TODO(oren): There's a good amount of code reuse here.
@@ -96,16 +105,23 @@ private:
   void op_BRClear(uint8_t flag, AddressT target);
   void op_BRSet(uint8_t flag, AddressT target);
   void op_XFER(DataT source, DataT &dest);
+  void op_TXS();
+  void op_PHA();
   void op_PUSH(DataT source);
-  void op_PULL(DataT &dest);
-  void op_JMP(AddressT target, bool sr = false);
+  void op_PLA();
+  void op_JSR(AddressT target);
+  void op_JMP(AddressT target);
   void op_RTS();
   void op_RTI();
   void op_PHP();
   void op_PLP();
   void op_BRK();
+  void op_ClearFlag(uint8_t select);
+  void op_SetFlag(uint8_t select);
+  void op_NOP();
 
   void setOrClearStatus(bool pred, uint8_t mask);
+  DataT doBinaryAdc(DataT addend);
 
   AddressT addr_Accumulator();
   AddressT addr_Immediate();
@@ -118,9 +134,8 @@ private:
   AddressT addr_AbsoluteY();
   AddressT addr_ZeroPageX();
   AddressT addr_ZeroPageY();
-  AddressT addr_IndexedIndirect();
-  AddressT addr_IndirectIndexed();
-  // REPLACE
+  AddressT addr_IndexedIndirect(); // Indirect,X ($FF, X)
+  AddressT addr_IndirectIndexed(); // Indirect,Y ($FF),Y
 };
 
 } // namespace cpu

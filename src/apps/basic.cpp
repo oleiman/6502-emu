@@ -46,9 +46,9 @@ class EhBASIC {
   constexpr static int MemorySize = 0x10000;
 
 public:
-  EhBASIC(std::ifstream &romfile)
-      : cpu(memory.addressBus(), memory.dataBus()), input_buffer_(32, '\0'),
-        input_thread_(&EhBASIC::readInput, this) {
+  EhBASIC(std::ifstream &romfile, std::function<void(void)> tick)
+      : cpu(memory.addressBus(), memory.dataBus(), tick),
+        input_buffer_(32, '\0'), input_thread_(&EhBASIC::readInput, this) {
     cpu.registerCallback(
         instr::Operation::loadA,
         std::bind(&EhBASIC::loadCB, this, std::placeholders::_1));
@@ -138,6 +138,8 @@ void enableRawMode() {
 int main(int argc, char **argv) {
   std::filesystem::current_path(xstr(SOURCE_DIR));
   std::ifstream rom("test/rom/ehBASIC/ehbasic_alt.bin", std::ios::binary);
-  EhBASIC basic(rom);
+  int cycles = 0;
+  auto tick = [&cycles]() { ++cycles; };
+  EhBASIC basic(rom, tick);
   basic.run();
 }
