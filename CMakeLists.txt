@@ -12,10 +12,14 @@ set_property(TARGET 6502-emu PROPERTY CXX_STANDARD 17)
 # include_directories(sr)
 
 
-add_executable(EhBASIC src/apps/basic.cpp)
-target_include_directories(EhBASIC PRIVATE inc)
-set_property(TARGET EhBASIC PROPERTY CXX_STANDARD 17)
-target_link_libraries(EhBASIC 6502-emu pthread) 
+if (WITH_BASIC)
+  add_executable(EhBASIC src/apps/basic.cpp)
+  target_include_directories(EhBASIC PRIVATE inc)
+  set_property(TARGET EhBASIC PROPERTY CXX_STANDARD 17)
+  target_link_libraries(EhBASIC 6502-emu pthread)
+endif()
 
 
-add_subdirectory(test)
+if (WITH_TESTS)
+  add_subdirectory(test)
+endif()
