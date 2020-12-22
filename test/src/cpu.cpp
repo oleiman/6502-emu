@@ -18,12 +18,11 @@ using std::make_shared;
 using std::filesystem::current_path;
 
 using cpu::M6502;
-using mem::Ram;
-
-constexpr int memory_size = 0x10000;
+using mem::ArrayMapper;
+using mem::VRam;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
-  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
@@ -49,7 +48,7 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 }
 
 TEST_CASE("KlausFunctional", "[integration][cpu]") {
-  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
@@ -79,7 +78,7 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
 }
 
 TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
-  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
@@ -112,7 +111,7 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
 }
 
 TEST_CASE("Timing", "[cpu][timing]") {
-  Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
@@ -155,7 +154,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
 
 // TODO(oren): assemble this test
 // TEST_CASE("KlausInterrupt", "[integration][cpu]") {
-//   Ram<memory_size, M6502::AddressT, M6502::DataT> memory;
+//   Ram<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
 //   int cycles = 0;
 //   int instructions = 0;
 //   auto tick = [&cycles]() { ++cycles; };

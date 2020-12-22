@@ -30,6 +30,8 @@
 #define STACK_BASE 0x0100
 #define STACK_POINTER(X) (STACK_BASE | X)
 
+#define NMI_VEC 0xFFFA
+#define RST_VEC 0xFFFC
 #define BRK_VEC 0xFFFE
 
 namespace cpu {
