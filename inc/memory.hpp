@@ -69,7 +69,7 @@ template <typename Mapper> class VRam {
 public:
   using AddressT = typename Mapper::AddressT;
   using DataT = typename Mapper::DataT;
-  explicit VRam() {
+  explicit VRam(Mapper m) : mapper_(m) {
     data_bus_.setPutCallback(
         std::bind(&VRam::write, this, std::placeholders::_1));
     data_bus_.setGetCallback(std::bind(&VRam::read, this));

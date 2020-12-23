@@ -142,8 +142,13 @@ void Instruction::decodeAddressMode() {
     }
     break;
   case 0x0B:
-    // NOTE: all illegal
-    address_mode_ = AddressMode::implicit;
+    // NOTE: all either illegal or unofficial
+    if (hi == 0x0E) { // unofficial SBC immediate
+      address_mode_ = AddressMode::immediate;
+    } else {
+      address_mode_ = AddressMode::implicit;
+    }
+
     break;
   case 0x0C:
     if (hi == 0x06) {
@@ -242,6 +247,7 @@ void Instruction::decodeOperation() {
   case 0xE1:
   case 0xE5:
   case 0xE9:
+  case 0xEB: // unofficial
   case 0xED:
   case 0xF1:
   case 0xF5:
