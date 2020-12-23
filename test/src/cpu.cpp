@@ -22,14 +22,14 @@ using mem::ArrayMapper;
 using mem::VRam;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
-  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
+  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
+  VRam memory(mp);
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
 
-  // 0x4000 specific to test program from interwebs
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(AllSuiteA, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x4000));
@@ -48,7 +48,8 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 }
 
 TEST_CASE("KlausFunctional", "[integration][cpu]") {
-  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
+  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
+  VRam memory(mp);
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
@@ -78,14 +79,14 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
 }
 
 TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
-  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
+  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
+  VRam memory(mp);
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
 
-  // 0x400 specific to test program from interwebs
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(BruceClarkDecimal, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x0200u));
@@ -111,14 +112,14 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
 }
 
 TEST_CASE("Timing", "[cpu][timing]") {
-  VRam<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
+  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
+  VRam memory(mp);
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
 
-  // 0x400 specific to test program from interwebs
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(Timing, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x1000));
@@ -161,7 +162,6 @@ TEST_CASE("Timing", "[cpu][timing]") {
 
 //   M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
 
-//   // 0x400 specific to test program from interwebs
 //   current_path(xestr(SOURCE_DIR));
 //   std::ifstream infile(KlausInterrupt, std::ios::binary);
 //   REQUIRE(cpu.loadRom(infile, 0x0000u));
