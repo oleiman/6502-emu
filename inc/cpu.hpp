@@ -15,13 +15,15 @@ struct CpuState {
   // TODO(oren): manual indicates that SP is initialized by
   // the programmer...
   explicit CpuState()
-      : rA(0x00), rX(0x00), rY(0x00), sp(0xFF), pc(0x0000), status(0x0000) {}
-  uint8_t rA;     // Accumulator
-  uint8_t rX;     // Index Register X
-  uint8_t rY;     // Index Reginster Y
-  uint8_t sp;     // Stack Pointer
-  uint16_t pc;    // Program Counter
-  uint8_t status; // Status Regiser
+      : rA(0x00), rX(0x00), rY(0x00), sp(0xFF), pc(0x0000), status(0x0000),
+        cycle(0) {}
+  uint8_t rA;               // Accumulator
+  uint8_t rX;               // Index Register X
+  uint8_t rY;               // Index Reginster Y
+  uint8_t sp;               // Stack Pointer
+  uint16_t pc;              // Program Counter
+  uint8_t status;           // Status Regiser
+  unsigned long long cycle; // cycle counter
 };
 
 class M6502 {
@@ -33,8 +35,9 @@ public:
   using Callback = std::function<void(AddressT)>;
 
   explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus,
-                 std::function<void(void)> tick)
-      : address_bus_(abus), data_bus_(mbus), tick_(tick) {}
+                 std::function<void(void)> tick, bool enable_bcd = true)
+      : address_bus_(abus), data_bus_(mbus), clock_callback_(tick),
+        enable_bcd_(enable_bcd) {}
 
   ~M6502() = default;
   bool loadRom(std::ifstream &infile, AddressT start);
@@ -58,9 +61,10 @@ public:
     // std::stringstream ss;
     // ss << std::hex << state_.pc << std::endl;
     // std::cerr << ss.str();
+    auto c = state_.cycle;
     DataT opcode = readByte(state_.pc);
     instr::Instruction in(
-        opcode, state_.pc,
+        opcode, state_.pc, c,
         std::bind(&M6502::calculateAddress, this, std::placeholders::_1));
 
     debugger.step(in, state_, address_bus_, data_bus_);
@@ -73,6 +77,10 @@ public:
   void registerCallback(instr::Operation op, Callback c);
 
 private:
+  void tick_() {
+    ++state_.cycle;
+    clock_callback_();
+  }
   const static AddressT NMI_VEC = 0xFFFA;
   const static AddressT RST_VEC = 0xFFFC;
 
@@ -80,9 +88,11 @@ private:
 
   mem::Bus<AddressT> &address_bus_;
   mem::Bus<DataT> &data_bus_;
-  std::function<void(void)> tick_;
+  std::function<void(void)> clock_callback_;
+
   bool pending_reset_ = false;
   bool pending_nmi_ = false;
+  bool enable_bcd_;
 
   AddressT code_start_;
   std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;
@@ -91,7 +101,7 @@ private:
   DataT readByte(AddressT addr);
   void writeByte(AddressT addr, DataT data);
 
-  AddressT calculateAddress(instr::AddressMode mode);
+  AddressT calculateAddress(instr::Instruction &in);
 
   // Compute offset address, tick clock if page boundary crossed
   AddressT penalizedOffset(AddressT base, uint8_t offset);
@@ -141,7 +151,7 @@ private:
   void op_NOP();
 
   void setOrClearStatus(bool pred, uint8_t mask);
-  DataT doBinaryAdc(DataT addend);
+  DataT doBinaryAdc(DataT reg, DataT addend);
 
   AddressT addr_Accumulator();
   AddressT addr_Immediate();
@@ -150,12 +160,12 @@ private:
   AddressT addr_ZeroPage();
   AddressT addr_Relative();
   AddressT addr_Indirect();
-  AddressT addr_AbsoluteX();
-  AddressT addr_AbsoluteY();
+  AddressT addr_AbsoluteX(instr::Operation op);
+  AddressT addr_AbsoluteY(instr::Operation op);
   AddressT addr_ZeroPageX();
   AddressT addr_ZeroPageY();
-  AddressT addr_IndexedIndirect(); // Indirect,X ($FF, X)
-  AddressT addr_IndirectIndexed(); // Indirect,Y ($FF),Y
+  AddressT addr_IndexedIndirect();                    // Indirect,X ($FF, X)
+  AddressT addr_IndirectIndexed(instr::Operation op); // Indirect,Y ($FF),Y
 };
 
 } // namespace cpu

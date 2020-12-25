@@ -92,8 +92,8 @@ class Instruction {
   using DataT = uint8_t;
 
 public:
-  explicit Instruction(DataT opcode, AddressT pc,
-                       std::function<AddressT(AddressMode)> calcAddr);
+  explicit Instruction(DataT opcode, AddressT pc, unsigned long long cycle,
+                       std::function<AddressT(Instruction &)> calcAddr);
   ~Instruction() = default;
 
   Operation operation() const { return operation_; }
@@ -102,12 +102,14 @@ public:
   DataT opcode() const { return opcode_; }
   AddressT address() const { return address_; }
   AddressT pc() const { return pc_; }
+  unsigned long long cycle() const { return start_cycle_; }
 
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
 private:
   DataT opcode_;
   DataT size_;
+  unsigned long long start_cycle_;
   AddressMode address_mode_;
   Operation operation_;
   AddressT pc_;

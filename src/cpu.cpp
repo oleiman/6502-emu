@@ -1,5 +1,6 @@
 #include "cpu.hpp"
 
+#include <bitset>
 #include <iostream>
 
 #define C_O 0
@@ -77,9 +78,11 @@ void M6502::step() {
     pending_reset_ = false;
   }
 
+  auto c = state_.cycle;
+
   DataT opcode = readByte(state_.pc);
   instr::Instruction in(
-      opcode, state_.pc,
+      opcode, state_.pc, c,
       std::bind(&M6502::calculateAddress, this, std::placeholders::_1));
   fireCallbacks(in);
   state_.pc += in.size();
@@ -111,9 +114,9 @@ void M6502::writeByte(AddressT addr, DataT data) {
   tick_();
 }
 
-M6502::AddressT M6502::calculateAddress(instr::AddressMode mode) {
+M6502::AddressT M6502::calculateAddress(instr::Instruction &in) {
   using instr::AddressMode;
-  switch (mode) {
+  switch (in.addressMode()) {
   case AddressMode::accumulator:
     return addr_Accumulator();
   case AddressMode::immediate:
@@ -121,9 +124,9 @@ M6502::AddressT M6502::calculateAddress(instr::AddressMode mode) {
   case AddressMode::absolute:
     return addr_Absolute();
   case AddressMode::absoluteX:
-    return addr_AbsoluteX();
+    return addr_AbsoluteX(in.operation());
   case AddressMode::absoluteY:
-    return addr_AbsoluteY();
+    return addr_AbsoluteY(in.operation());
   case AddressMode::zeroPage:
     return addr_ZeroPage();
   case AddressMode::zeroPageX:
@@ -137,7 +140,7 @@ M6502::AddressT M6502::calculateAddress(instr::AddressMode mode) {
   case AddressMode::indexedIndirect:
     return addr_IndexedIndirect();
   case AddressMode::indirectIndexed:
-    return addr_IndirectIndexed();
+    return addr_IndirectIndexed(in.operation());
   default:
     return addr_Implicit();
     ;
@@ -350,25 +353,6 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_Illegal(in.opcode());
     break;
   }
-  // TODO(oren): Verify. some operations will tick the clock while in progress,
-  // but every operation will advance the clock by at least one cycle.
-  // For lack of a better approach, I'm ticking the clock _after_ the state of
-  // the processor has been finalized.
-  // A better approach might be to tick the clock manually as each operation
-  // progresses. For example, on a read/modify/write instruction, does it make
-  // sense to tick the clock _after_ committing the closing write?
-  // Put another way, this tick corresponds to the Execution stage, but certain
-  // operations may consume additional cycle after execution.
-  // NOTE(oren): actually there's a read inside, for example, ADC. In the
-  // current scheme this will cost one cycle, though it's worth noting that the
-  // cycle costs in general are not actually the result of read/write
-  // operations, per se. The memory unit is not cycle stepped, and I read
-  // somewhere that, for reads, there's a 10ns latency between hitting the
-  // address bus and data appearing on the data bus. This is a little confusing,
-  // but I'm hoping that just ticking on every read/write will get us close
-  // enough for NES emulation. Will have to read up on the PPU a bit more,
-  // implement it, and see.
-  // tick_();
 }
 
 void M6502::op_Illegal(DataT opcode) {
@@ -377,8 +361,6 @@ void M6502::op_Illegal(DataT opcode) {
      << "Illegal Opcode: <0x" << std::hex << std::setfill('0') << std::setw(2)
      << +opcode << ">";
   throw std::runtime_error(ss.str());
-  // TODO(oren): maybe should bail here, but useful to press on
-  // for debugging purposes
 }
 
 // TODO(oren): a bit gross, but adding NMI and RESET fairly easily
@@ -431,7 +413,7 @@ void M6502::op_ADC(AddressT source) {
   // DataT input_carry = GET(_state.status, CARRY_M);
   uint16_t result = 0;
 
-  if (GET(state_.status, DECIMAL_M)) {
+  if (GET(state_.status, DECIMAL_M) && enable_bcd_) {
     DataT accum_hi = (state_.rA & 0xF0) >> 4;
     DataT accum_lo = state_.rA & 0x0F;
     DataT accum_dec = accum_hi * 10 + accum_lo;
@@ -450,7 +432,7 @@ void M6502::op_ADC(AddressT source) {
     setOrClearStatus(result == 0, ZERO_M);
     setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
   } else {
-    result = doBinaryAdc(addend);
+    result = doBinaryAdc(state_.rA, addend);
   }
   state_.rA = static_cast<DataT>(result);
 }
@@ -463,7 +445,7 @@ void M6502::op_SBC(AddressT source) {
   // DataT input_carry = GET(_state.status, CARRY_M);
   uint16_t result = 0;
 
-  if (GET(state_.status, DECIMAL_M)) {
+  if (GET(state_.status, DECIMAL_M) && enable_bcd_) {
 
     DataT accum_hi = (state_.rA & 0xF0) >> 4;
     DataT accum_lo = state_.rA & 0x0F;
@@ -487,7 +469,7 @@ void M6502::op_SBC(AddressT source) {
     }
     result = ((accum_dec / 10) << 4) | (accum_dec % 10);
   } else {
-    result = doBinaryAdc(~subtrahend);
+    result = doBinaryAdc(state_.rA, ~subtrahend);
   }
   state_.rA = static_cast<DataT>(result);
 }
@@ -513,7 +495,7 @@ void M6502::op_INR(DataT &reg, int8_t val) {
 // arithmetic shift left (read/modify/write)
 void M6502::op_ASL(AddressT source) {
   DataT result = readByte(source);
-  writeByte(source, result);
+  // writeByte(source, result);
   op_ASLV(result);
   writeByte(source, result);
 }
@@ -529,6 +511,8 @@ void M6502::op_ASLV(DataT &val) {
 // logical shift right on memory
 void M6502::op_LSR(AddressT source) {
   DataT result = readByte(source);
+  // dummy write
+  // writeByte(source, result);
   op_LSRV(result);
   writeByte(source, result);
 }
@@ -606,16 +590,30 @@ void M6502::op_EOR(AddressT source) {
 // compare memory and register
 void M6502::op_CMP(DataT reg, AddressT source) {
   DataT val = readByte(source);
+  // uint16_t result = static_cast<uint16_t>(reg);
+  // result += static_cast<uint16_t>(~val);
+  // setOrClearStatus(result & 0xFF00, CARRY_M);
+  // result &= 0xFF;
+  // setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
+  // setOrClearStatus(result == 0, ZERO_M);
+
+  if (reg != val) {
+    uint8_t tmp = reg - val;
+    setOrClearStatus(GET(tmp, NEGATIVE_M), NEGATIVE_M);
+  } else {
+    CLEAR(state_.status, NEGATIVE_M);
+  }
+
   if (reg < val) {
-    SET(state_.status, NEGATIVE_M);
+    // SET(state_.status, NEGATIVE_M);
     CLEAR(state_.status, ZERO_M);
     CLEAR(state_.status, CARRY_M);
   } else if (reg == val) {
-    CLEAR(state_.status, NEGATIVE_M);
+    // CLEAR(state_.status, NEGATIVE_M);
     SET(state_.status, ZERO_M);
     SET(state_.status, CARRY_M);
   } else if (reg > val) {
-    CLEAR(state_.status, NEGATIVE_M);
+    // CLEAR(state_.status, NEGATIVE_M);
     CLEAR(state_.status, ZERO_M);
     SET(state_.status, CARRY_M);
   }
@@ -633,6 +631,10 @@ void M6502::op_BIT(AddressT source) {
 // branch if flag is clear
 void M6502::op_BRClear(uint8_t flag, AddressT target) {
   if (GET(state_.status, flag) == 0) {
+    // page crossing penalty
+    if ((state_.pc >> 8) ^ (target >> 8)) {
+      tick_();
+    }
     op_JMP(target);
   }
 }
@@ -640,6 +642,10 @@ void M6502::op_BRClear(uint8_t flag, AddressT target) {
 // branch if flag is set
 void M6502::op_BRSet(uint8_t flag, AddressT target) {
   if (GET(state_.status, flag)) {
+    // page crossing penalty
+    if ((state_.pc >> 8) ^ (target >> 8)) {
+      tick_();
+    }
     op_JMP(target);
   }
 }
@@ -671,6 +677,7 @@ void M6502::op_PUSH(DataT source) {
 // pop from the stack into dest
 void M6502::op_PLA() {
   state_.sp++;
+  tick_();
   state_.rA = readByte(STACK_POINTER(state_.sp));
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
@@ -705,8 +712,9 @@ void M6502::op_RTS() {
   DataT target_lo = readByte(STACK_POINTER(state_.sp++)); // tick 3
   AddressT target_hi =
       static_cast<AddressT>(readByte(STACK_POINTER(state_.sp))); // tick 4
-  state_.pc = (target_hi << 8) | target_lo;
+  op_JMP((target_hi << 8) | target_lo);
   state_.pc++;
+  tick_();
 }
 
 // return from interrupt
@@ -738,7 +746,7 @@ void M6502::op_PLP() {
   CLEAR(tmp, BIT5_M);
   CLEAR(tmp, BIT4_M);
   state_.status = tmp;
-  tick_();
+  tick_(); // tick 4
 }
 
 // force interrupt
@@ -764,9 +772,9 @@ void M6502::setOrClearStatus(bool pred, uint8_t mask) {
   }
 }
 
-M6502::DataT M6502::doBinaryAdc(DataT addend) {
+M6502::DataT M6502::doBinaryAdc(DataT reg, DataT addend) {
   uint16_t result;
-  result = static_cast<uint16_t>(state_.rA);
+  result = static_cast<uint16_t>(reg);
   result += static_cast<uint16_t>(addend);
   result += GET(state_.status, CARRY_M);
   setOrClearStatus(result & 0xFF00, CARRY_M);
@@ -777,10 +785,13 @@ M6502::DataT M6502::doBinaryAdc(DataT addend) {
   setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(result == 0, ZERO_M);
 
-  if (GET(state_.rA, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
-      GET(state_.rA, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
+  if (GET(reg, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
+      GET(reg, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
+    // std::cerr << "setting overflow: " << +reg << "+" << +addend << "="
+    //           << +result << std::endl;
     SET(state_.status, OVERFLOW_M);
   } else {
+    // std::cerr << "clear overflow" << std::endl;
     CLEAR(state_.status, OVERFLOW_M);
   }
   return static_cast<DataT>(result);
@@ -819,9 +830,6 @@ M6502::AddressT M6502::addr_Relative() {
     offset = -offset;
     target = base - static_cast<uint8_t>(offset);
   }
-  if ((base >> 8) ^ (target >> 8)) {
-    tick_();
-  }
   return target;
 }
 
@@ -829,27 +837,46 @@ M6502::AddressT M6502::addr_Indirect() {
   DataT i_addr_lo = readByte(state_.pc + 1);
   AddressT i_addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT i_addr = (i_addr_hi << 8) | i_addr_lo;
-  DataT addr_lo = readByte(i_addr++);
-  AddressT addr_hi = static_cast<AddressT>(readByte(i_addr++));
+  DataT addr_lo = readByte(i_addr);
+
+  if ((i_addr | 0xFF) == i_addr) {
+    i_addr &= 0xFF00;
+  } else {
+    i_addr++;
+  }
+
+  AddressT addr_hi = static_cast<AddressT>(readByte(i_addr));
   AddressT addr = (addr_hi << 8) | addr_lo;
   return addr;
 }
 
-// TODO(oren): For some reason, ASL doesn't incur a penalty for
-// crossing a page boundary in this mode :(
-// same deal for ROL/ROR actually, and a few others
-// STORE always penalized
-M6502::AddressT M6502::addr_AbsoluteX() {
+M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
+  using instr::Operation;
   DataT addr_lo = readByte(state_.pc + 1);
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
+
+  // always pay an extra cycle for these
+  if (op == Operation::shiftL || op == Operation::shiftR ||
+      op == Operation::rotateL || op == Operation::rotateR ||
+      op == Operation::decrement || op == Operation::increment ||
+      op == Operation::storeA) {
+    tick_();
+    return base + state_.rX;
+  }
   return penalizedOffset(base, state_.rX);
 }
 
-M6502::AddressT M6502::addr_AbsoluteY() {
+M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
   DataT addr_lo = readByte(state_.pc + 1);
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
+
+  // no page cross optimization for a store. always advance the clock here.
+  if (op == instr::Operation::storeA) {
+    tick_();
+    return base + state_.rY;
+  }
   return penalizedOffset(base, state_.rY);
 }
 
@@ -873,12 +900,16 @@ M6502::AddressT M6502::addr_IndexedIndirect() {
   return addr;
 }
 
-M6502::AddressT M6502::addr_IndirectIndexed() {
+M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
   AddressT zp_addr = static_cast<AddressT>(readByte(state_.pc + 1));
   DataT addr_lo = readByte(zp_addr++);
   zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
+  if (op == instr::Operation::storeA) {
+    tick_();
+    return base + state_.rY;
+  }
   return penalizedOffset(base, state_.rY);
 }
 

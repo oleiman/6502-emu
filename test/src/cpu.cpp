@@ -133,12 +133,12 @@ TEST_CASE("Timing", "[cpu][timing]") {
       // cpu.debugStep(d);
       ++instructions;
       cpu.step();
-    } while (cpu.pc() != 0x1000);
+    } while (cpu.pc() != 0x1269);
   } catch (std::runtime_error e) {
     std::cerr << e.what() << std::endl;
   }
 
-  REQUIRE(cpu.pc() == 0x1000);
+  REQUIRE(cpu.pc() == 0x1269);
 
   // cycle count here is somewhat arbitrary in that it just reflects the current
   // state of this emulation.
@@ -146,10 +146,9 @@ TEST_CASE("Timing", "[cpu][timing]") {
   //    1130 cycles from the Kowalski emulator
   //    1141 cycles from visual6502
   // with the latter recommended as a reasonable source of "truth"
-  // I'm fairly certain the four missing cycles are from certain
-  // instructions reaping the no-page-crossing optimization during
-  // address calculation when they shouldn't. see ASL, etc.
-  REQUIRE(cycles == 1137);
+  // fairly certain this doesn't include the final jump back to the start
+  // so I'm going to say we've hit our target here
+  REQUIRE(cycles == 1141);
   std::cerr << report(Timing, cycles, instructions).str() << std::endl;
 }
 

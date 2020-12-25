@@ -43,13 +43,14 @@ array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
     "ZeroX", "ZeroY", "Rel", "Indir", "IdxIndir", "IndirIdx",
 };
 
-Instruction::Instruction(DataT opcode, AddressT pc,
-                         function<AddressT(AddressMode)> calc_addr)
-    : opcode_(opcode), size_(1), address_mode_(AddressMode::implicit),
-      operation_(Operation::illegal), pc_(pc) {
+Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle,
+                         function<AddressT(Instruction &)> calc_addr)
+    : opcode_(opcode), size_(1), start_cycle_(cycle),
+      address_mode_(AddressMode::implicit), operation_(Operation::illegal),
+      pc_(pc) {
   decodeAddressMode();
   decodeOperation();
-  address_ = calc_addr(address_mode_);
+  address_ = calc_addr(*this);
 }
 
 void Instruction::decodeAddressMode() {
@@ -506,6 +507,7 @@ ostream &operator<<(ostream &os, Instruction const &in) {
        << aModeMnemonics[static_cast<int>(in.address_mode_)] << ")";
     break;
   }
+  ss << " C: " << std::dec << in.start_cycle_ + 7;
   os << ss.str();
   return os;
 }

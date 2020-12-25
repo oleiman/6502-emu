@@ -47,7 +47,9 @@ void Debugger::step(Instruction const &in, CpuState const &state,
     string command;
     cout << "> ";
     getline(cin, command);
-    if (command == "run" || command == "continue") {
+    if (command == "exit") {
+      throw std::runtime_error("Debugger Exit");
+    } else if (command == "run" || command == "continue") {
       break_ = false;
     } else if (command == "where" || command[0] == 'w') {
       if (prev_in_) {
