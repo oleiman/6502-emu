@@ -58,13 +58,13 @@ void Instruction::decodeAddressMode() {
 
   switch (lo) {
   case 0x00:
-    if (hi == 0x00 || hi == 0x04 || hi == 0x06 || hi == 0x08) {
-      // NOTE: 0x80 is illegal
+    if (hi == 0x00 || hi == 0x04 || hi == 0x06) {
       address_mode_ = AddressMode::implicit;
     } else if (hi == 0x02) {
       address_mode_ = AddressMode::absolute;
       size_ = 3;
-    } else if (hi % 2 == 0) {
+    } else if ((hi & 0x01) == 0) {
+      // NOTE: 0x80 is unofficial nop
       address_mode_ = AddressMode::immediate;
       size_ = 2;
     } else {
@@ -72,7 +72,7 @@ void Instruction::decodeAddressMode() {
     }
     break;
   case 0x01:
-    if (hi % 2 == 0) {
+    if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::indexedIndirect;
     } else {
       address_mode_ = AddressMode::indirectIndexed;
@@ -91,17 +91,15 @@ void Instruction::decodeAddressMode() {
     address_mode_ = AddressMode::implicit;
     break;
   case 0x04:
-    if (hi == 0x00 || hi == 0x01 || (hi >= 0x03 && hi <= 0x07) || hi == 0x0D ||
-        hi == 0x0F) {
-      address_mode_ = AddressMode::implicit;
-    } else if (hi % 2 == 0) {
+    if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::zeroPage;
     } else {
+      // includes 0x14, unofficial zpx nop
       address_mode_ = AddressMode::zeroPageX;
     }
     break;
   case 0x05:
-    if (hi % 2 == 0) {
+    if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::zeroPage;
     } else {
       address_mode_ = AddressMode::zeroPageX;
@@ -110,7 +108,7 @@ void Instruction::decodeAddressMode() {
   case 0x06:
     if (hi == 0x09 || hi == 0x0B) {
       address_mode_ = AddressMode::zeroPageY;
-    } else if (hi % 2 == 0) {
+    } else if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::zeroPage;
     } else {
       address_mode_ = AddressMode::zeroPageX;
@@ -127,17 +125,17 @@ void Instruction::decodeAddressMode() {
     if (hi == 0x08) {
       // NOTE: illegal
       address_mode_ = AddressMode::implicit;
-    } else if (hi % 2 == 0) {
+    } else if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::immediate;
     } else {
       address_mode_ = AddressMode::absoluteY;
     }
     break;
   case 0x0A:
-    if (hi % 2 == 0 && hi < 0x08) {
+    if ((hi & 0x01) == 0 && hi < 0x08) {
       address_mode_ = AddressMode::accumulator;
     } else {
-      // NOTE: 1, 3, 5, 7, D, F illegal
+      // NOTE: 1, 3, 5, 7, D, F unofficial
       address_mode_ = AddressMode::implicit;
     }
     break;
@@ -153,17 +151,16 @@ void Instruction::decodeAddressMode() {
   case 0x0C:
     if (hi == 0x06) {
       address_mode_ = AddressMode::indirect;
-    } else if (hi > 0x00 && hi % 2 == 0) {
-      address_mode_ = AddressMode::absolute;
-    } else if (hi == 0x0B) {
+    } else if (hi & 0x01) {
+      // some are unofficial
       address_mode_ = AddressMode::absoluteX;
     } else {
-      // NOTE: rest illegal
-      address_mode_ = AddressMode::implicit;
+      // NOTE: some are unofficial, but all are absolute
+      address_mode_ = AddressMode::absolute;
     }
     break;
   case 0x0D:
-    if (hi % 2 == 0) {
+    if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::absolute;
     } else {
       address_mode_ = AddressMode::absoluteX;
@@ -175,7 +172,7 @@ void Instruction::decodeAddressMode() {
       address_mode_ = AddressMode::implicit;
     } else if (hi == 0x0B) {
       address_mode_ = AddressMode::absoluteY;
-    } else if (hi % 2 == 0) {
+    } else if ((hi & 0x01) == 0) {
       address_mode_ = AddressMode::absolute;
     } else {
       address_mode_ = AddressMode::absoluteX;
@@ -460,7 +457,30 @@ void Instruction::decodeOperation() {
   case 0xF8:
     operation_ = Operation::setD;
     break;
+  case 0x80:
+  case 0x0C:
+  case 0x1C:
+  case 0x3C:
+  case 0x5C:
+  case 0x7C:
+  case 0xDC:
+  case 0xFC:
+  case 0x04:
+  case 0x14:
+  case 0x34:
+  case 0x44:
+  case 0x54:
+  case 0x64:
+  case 0x74:
+  case 0xD4:
+  case 0xF4:
+  case 0x1A:
+  case 0x3A:
+  case 0x5A:
+  case 0x7A:
+  case 0xDA:
   case 0xEA:
+  case 0xFA:
     operation_ = Operation::nop;
     break;
   default:

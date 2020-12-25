@@ -30,8 +30,8 @@
 #define STACK_BASE 0x0100
 #define STACK_POINTER(X) (STACK_BASE | X)
 
-#define NMI_VEC 0xFFFA
-#define RST_VEC 0xFFFC
+// #define NMI_VEC 0xFFFA
+// #define RST_VEC 0xFFFC
 #define BRK_VEC 0xFFFE
 
 namespace cpu {
@@ -58,7 +58,25 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
   return true;
 }
 
+// NOTE: these are effectively interrupt pins, we'll pass them
+// into the ppu as callbacks. something a bit more general would
+// be nice, but this should be fine for now.
+void M6502::reset() { pending_reset_ = true; }
+void M6502::nmi() { pending_nmi_ = true; }
+
+std::function<void(void)> M6502::nmiPin() {
+  return std::bind(&M6502::nmi, this);
+}
+
 void M6502::step() {
+  if (pending_nmi_) {
+    op_Interrupt(NMI_VEC);
+    pending_nmi_ = false;
+  } else if (pending_reset_) {
+    op_Interrupt(RST_VEC);
+    pending_reset_ = false;
+  }
+
   DataT opcode = readByte(state_.pc);
   instr::Instruction in(
       opcode, state_.pc,
@@ -361,6 +379,33 @@ void M6502::op_Illegal(DataT opcode) {
   throw std::runtime_error(ss.str());
   // TODO(oren): maybe should bail here, but useful to press on
   // for debugging purposes
+}
+
+// TODO(oren): a bit gross, but adding NMI and RESET fairly easily
+// technically reset would consume the 7 cycles with dummy stack reads
+// but it shouldn't be timing critical so who care
+void M6502::op_Interrupt(AddressT vec) {
+  // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
+  if (vec != RST_VEC) {
+    AddressT returnAddr = state_.pc + 1;
+    DataT pc_hi = (returnAddr >> 8) & 0xFF;
+    DataT pc_lo = returnAddr & 0xFF;
+    op_PUSH(pc_hi); // tick 2
+    op_PUSH(pc_lo); // tick 3
+
+    DataT tmp = state_.status;
+    SET(tmp, BIT5_M);
+    SET(tmp, BIT4_M);
+    op_PUSH(tmp); // tick 4
+  }
+
+  DataT target_lo = readByte(vec);                               // tick 5
+  AddressT target_hi = static_cast<AddressT>(readByte(vec + 1)); // tick 6
+  AddressT target = (target_hi << 8) | target_lo;
+  if (vec != RST_VEC) {
+    SET(state_.status, INT_DISABLE_M);
+  }
+  op_JMP(target); // tick 7
 }
 
 // load
@@ -697,25 +742,7 @@ void M6502::op_PLP() {
 }
 
 // force interrupt
-void M6502::op_BRK() {
-  // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
-  AddressT returnAddr = state_.pc + 1;
-  DataT pc_hi = (returnAddr >> 8) & 0xFF;
-  DataT pc_lo = returnAddr & 0xFF;
-  op_PUSH(pc_hi); // tick 2
-  op_PUSH(pc_lo); // tick 3
-
-  DataT tmp = state_.status;
-  SET(tmp, BIT5_M);
-  SET(tmp, BIT4_M);
-  op_PUSH(tmp); // tick 4
-
-  DataT target_lo = readByte(BRK_VEC);                               // tick 5
-  AddressT target_hi = static_cast<AddressT>(readByte(BRK_VEC + 1)); // tick 6
-  AddressT target = (target_hi << 8) | target_lo;
-  SET(state_.status, INT_DISABLE_M);
-  op_JMP(target); // tick 7
-}
+void M6502::op_BRK() { op_Interrupt(BRK_VEC); }
 
 void M6502::op_ClearFlag(uint8_t select) {
   CLEAR(state_.status, select);
@@ -840,6 +867,7 @@ M6502::AddressT M6502::addr_IndexedIndirect() {
   AddressT zp_addr = static_cast<AddressT>(readByte(state_.pc + 1));
   zp_addr = wrapAroundOffset(zp_addr, state_.rX);
   DataT addr_lo = readByte(zp_addr++);
+  zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT addr = (addr_hi << 8) | addr_lo;
   return addr;
@@ -848,6 +876,7 @@ M6502::AddressT M6502::addr_IndexedIndirect() {
 M6502::AddressT M6502::addr_IndirectIndexed() {
   AddressT zp_addr = static_cast<AddressT>(readByte(state_.pc + 1));
   DataT addr_lo = readByte(zp_addr++);
+  zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
   return penalizedOffset(base, state_.rY);

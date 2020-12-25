@@ -28,6 +28,8 @@ class M6502 {
 public:
   using AddressT = uint16_t;
   using DataT = uint8_t;
+  // TODO(oren): Callback hack is used only for EhBASIC, and I think
+  // we can cover this use case with the memory mapper abstraction.
   using Callback = std::function<void(AddressT)>;
 
   explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus,
@@ -39,8 +41,20 @@ public:
   void initPc(AddressT val) { state_.pc = val; }
   AddressT pc() const { return state_.pc; }
   void step();
+  void reset();
+  // TODO(oren): should be private
+  void nmi();
+
+  std::function<void(void)> nmiPin();
 
   template <class Debugger> void debugStep(Debugger &debugger) {
+    if (pending_nmi_) {
+      op_Interrupt(NMI_VEC);
+      pending_nmi_ = false;
+    } else if (pending_reset_) {
+      op_Interrupt(RST_VEC);
+      pending_reset_ = false;
+    }
     // std::stringstream ss;
     // ss << std::hex << state_.pc << std::endl;
     // std::cerr << ss.str();
@@ -59,11 +73,16 @@ public:
   void registerCallback(instr::Operation op, Callback c);
 
 private:
+  const static AddressT NMI_VEC = 0xFFFA;
+  const static AddressT RST_VEC = 0xFFFC;
+
   CpuState state_;
 
   mem::Bus<AddressT> &address_bus_;
   mem::Bus<DataT> &data_bus_;
   std::function<void(void)> tick_;
+  bool pending_reset_ = false;
+  bool pending_nmi_ = false;
 
   AddressT code_start_;
   std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;
@@ -83,6 +102,7 @@ private:
   // Good software engineering, not so good for the prospect
   // of migrating to a cycle-ticked architecture.
   void op_Illegal(DataT opcode);
+  void op_Interrupt(AddressT vec);
   void op_LD(DataT &dest, AddressT source);
   void op_ST(AddressT dest, DataT data);
   void op_ADC(AddressT source);
