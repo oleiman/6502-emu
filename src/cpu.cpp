@@ -15,6 +15,8 @@
 // status byte masks
 #define CARRY_M (0x01u << C_O)
 #define ZERO_M (0x01u << Z_O)
+// TODO(oren): looks like this is ignored everywhere
+// need to read up on where it's set/cleared
 #define INT_DISABLE_M (0x01u << I_O)
 #define DECIMAL_M (0x01u << D_O)
 #define BIT4_M (0x01u << B4_O)
@@ -62,6 +64,7 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
 // NOTE: these are effectively interrupt pins, we'll pass them
 // into the ppu as callbacks. something a bit more general would
 // be nice, but this should be fine for now.
+// TODO(oren): Reset should restore CPU to reset state, currently does nothing
 void M6502::reset() { pending_reset_ = true; }
 void M6502::nmi() { pending_nmi_ = true; }
 
@@ -93,6 +96,10 @@ void M6502::registerCallback(instr::Operation op, Callback c) {
   callbacks_[op].push_back(c);
 }
 
+void M6502::registerClockCallback(std::function<void(void)> c) {
+  clock_callback_ = c;
+}
+
 void M6502::fireCallbacks(instr::Instruction const &in) {
   if (callbacks_.count(in.operation()) > 0) {
     for (auto &c : callbacks_[in.operation()]) {
@@ -104,14 +111,14 @@ void M6502::fireCallbacks(instr::Instruction const &in) {
 M6502::DataT M6502::readByte(AddressT addr) {
   address_bus_.put(addr);
   auto b = data_bus_.get();
-  tick_();
+  tick();
   return b;
 }
 
 void M6502::writeByte(AddressT addr, DataT data) {
   address_bus_.put(addr);
   data_bus_.put(data);
-  tick_();
+  tick();
 }
 
 M6502::AddressT M6502::calculateAddress(instr::Instruction &in) {
@@ -152,7 +159,7 @@ M6502::AddressT M6502::penalizedOffset(AddressT base, uint8_t offset) {
 
   // crossing page boundary?
   if ((base >> 8) ^ (result >> 8)) {
-    tick_();
+    tick();
   }
   return result;
 }
@@ -160,7 +167,7 @@ M6502::AddressT M6502::penalizedOffset(AddressT base, uint8_t offset) {
 M6502::AddressT M6502::wrapAroundOffset(AddressT base, uint8_t offset) {
   AddressT result = base + offset;
   result &= 0xFF;
-  tick_();
+  tick();
   return result;
 }
 
@@ -489,7 +496,7 @@ void M6502::op_INR(DataT &reg, int8_t val) {
   reg += val;
   setOrClearStatus(GET(reg, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(reg == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 // arithmetic shift left (read/modify/write)
@@ -505,7 +512,7 @@ void M6502::op_ASLV(DataT &val) {
   val <<= 1;
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 // logical shift right on memory
@@ -523,7 +530,7 @@ void M6502::op_LSRV(DataT &val) {
   val >>= 1;
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 // rotate left on memory
@@ -543,7 +550,7 @@ void M6502::op_ROLV(DataT &val) {
   }
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 // rotate right on memory
@@ -563,7 +570,7 @@ void M6502::op_RORV(DataT &val) {
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
   // TODO(oren): verify
-  tick_();
+  tick();
 }
 
 // AND memory with accumulator
@@ -633,7 +640,7 @@ void M6502::op_BRClear(uint8_t flag, AddressT target) {
   if (GET(state_.status, flag) == 0) {
     // page crossing penalty
     if ((state_.pc >> 8) ^ (target >> 8)) {
-      tick_();
+      tick();
     }
     op_JMP(target);
   }
@@ -644,7 +651,7 @@ void M6502::op_BRSet(uint8_t flag, AddressT target) {
   if (GET(state_.status, flag)) {
     // page crossing penalty
     if ((state_.pc >> 8) ^ (target >> 8)) {
-      tick_();
+      tick();
     }
     op_JMP(target);
   }
@@ -652,7 +659,7 @@ void M6502::op_BRSet(uint8_t flag, AddressT target) {
 
 void M6502::op_TXS() {
   state_.sp = state_.rX;
-  tick_();
+  tick();
 }
 
 // transfer from source to dest
@@ -660,12 +667,12 @@ void M6502::op_XFER(DataT source, DataT &dest) {
   dest = source;
   setOrClearStatus(GET(dest, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(dest == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 void M6502::op_PHA() {
   op_PUSH(state_.rA);
-  tick_();
+  tick();
 }
 
 // push value onto stack
@@ -677,11 +684,11 @@ void M6502::op_PUSH(DataT source) {
 // pop from the stack into dest
 void M6502::op_PLA() {
   state_.sp++;
-  tick_();
+  tick();
   state_.rA = readByte(STACK_POINTER(state_.sp));
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
-  tick_();
+  tick();
 }
 
 // jump to subroutine
@@ -701,27 +708,27 @@ void M6502::op_JSR(AddressT target) {
 // jump and tick the clock
 void M6502::op_JMP(AddressT target) {
   state_.pc = target;
-  tick_();
+  tick();
 }
 
 // return from subroutine
 void M6502::op_RTS() {
   state_.sp++;
   // TODO(oren): consider consequences of ticking here rather than at the end
-  tick_();                                                // tick 2
+  tick();                                                 // tick 2
   DataT target_lo = readByte(STACK_POINTER(state_.sp++)); // tick 3
   AddressT target_hi =
       static_cast<AddressT>(readByte(STACK_POINTER(state_.sp))); // tick 4
   op_JMP((target_hi << 8) | target_lo);
   state_.pc++;
-  tick_();
+  tick();
 }
 
 // return from interrupt
 void M6502::op_RTI() {
   state_.sp++;
   // TODO(oren): consider consequences of ticking here rather than at the end
-  tick_();                                                // tick 2
+  tick();                                                 // tick 2
   state_.status = readByte(STACK_POINTER(state_.sp++));   // tick 3
   DataT target_lo = readByte(STACK_POINTER(state_.sp++)); // tick 4
   AddressT target_hi =
@@ -734,19 +741,19 @@ void M6502::op_PHP() {
   DataT tmp = state_.status;
   SET(tmp, BIT5_M);
   SET(tmp, BIT4_M);
-  tick_();      // tick 2
+  tick();       // tick 2
   op_PUSH(tmp); // tick 3
 }
 
 void M6502::op_PLP() {
   state_.sp++;
-  tick_();                                        // tick 2
+  tick();                                         // tick 2
   DataT tmp = readByte(STACK_POINTER(state_.sp)); // tick 3
   // ignore the "B Flag"
   CLEAR(tmp, BIT5_M);
   CLEAR(tmp, BIT4_M);
   state_.status = tmp;
-  tick_(); // tick 4
+  tick(); // tick 4
 }
 
 // force interrupt
@@ -754,15 +761,15 @@ void M6502::op_BRK() { op_Interrupt(BRK_VEC); }
 
 void M6502::op_ClearFlag(uint8_t select) {
   CLEAR(state_.status, select);
-  tick_();
+  tick();
 }
 
 void M6502::op_SetFlag(uint8_t select) {
   SET(state_.status, select);
-  tick_();
+  tick();
 }
 
-void M6502::op_NOP() { tick_(); }
+void M6502::op_NOP() { tick(); }
 
 void M6502::setOrClearStatus(bool pred, uint8_t mask) {
   if (pred) {
@@ -861,7 +868,7 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
       op == Operation::rotateL || op == Operation::rotateR ||
       op == Operation::decrement || op == Operation::increment ||
       op == Operation::storeA) {
-    tick_();
+    tick();
     return base + state_.rX;
   }
   return penalizedOffset(base, state_.rX);
@@ -874,7 +881,7 @@ M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
 
   // no page cross optimization for a store. always advance the clock here.
   if (op == instr::Operation::storeA) {
-    tick_();
+    tick();
     return base + state_.rY;
   }
   return penalizedOffset(base, state_.rY);
@@ -907,7 +914,7 @@ M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
   if (op == instr::Operation::storeA) {
-    tick_();
+    tick();
     return base + state_.rY;
   }
   return penalizedOffset(base, state_.rY);

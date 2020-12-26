@@ -35,9 +35,8 @@ public:
   using Callback = std::function<void(AddressT)>;
 
   explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus,
-                 std::function<void(void)> tick, bool enable_bcd = true)
-      : address_bus_(abus), data_bus_(mbus), clock_callback_(tick),
-        enable_bcd_(enable_bcd) {}
+                 bool enable_bcd = true)
+      : address_bus_(abus), data_bus_(mbus), enable_bcd_(enable_bcd) {}
 
   ~M6502() = default;
   bool loadRom(std::ifstream &infile, AddressT start);
@@ -75,9 +74,10 @@ public:
   }
 
   void registerCallback(instr::Operation op, Callback c);
+  void registerClockCallback(std::function<void(void)> tick);
 
 private:
-  void tick_() {
+  void tick() {
     ++state_.cycle;
     clock_callback_();
   }
@@ -98,6 +98,9 @@ private:
   std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;
 
   void fireCallbacks(instr::Instruction const &in);
+
+  // TODO(oren): let's add primitives for reading a whole 16-bit address from
+  // the bus. This would get rid of a _ton_ of repeated bit twiddling
   DataT readByte(AddressT addr);
   void writeByte(AddressT addr, DataT data);
 

@@ -6,6 +6,12 @@
 #include <functional>
 #include <sstream>
 
+// TODO(oren): big performance concerns here
+// lots of needless indirection in the bus design
+// All that's really required is that CPU/PPU have access to a R/W bus
+// that redirects to the appropriate memory map implementation.
+// At this point, the VRam object doesn't even own any memory...
+
 namespace mem {
 
 template <typename A, typename D> class ArrayMapper {
