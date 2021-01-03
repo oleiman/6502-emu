@@ -28,7 +28,8 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+  M6502 cpu(memory.addressBus(), memory.dataBus());
+  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(AllSuiteA, std::ios::binary);
@@ -54,7 +55,8 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+  M6502 cpu(memory.addressBus(), memory.dataBus());
+  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(KlausFunctional, std::ios::binary);
@@ -85,7 +87,8 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+  M6502 cpu(memory.addressBus(), memory.dataBus());
+  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(BruceClarkDecimal, std::ios::binary);
@@ -118,7 +121,8 @@ TEST_CASE("Timing", "[cpu][timing]") {
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+  M6502 cpu(memory.addressBus(), memory.dataBus());
+  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(Timing, std::ios::binary);
@@ -159,7 +163,8 @@ TEST_CASE("Timing", "[cpu][timing]") {
 //   int instructions = 0;
 //   auto tick = [&cycles]() { ++cycles; };
 
-//   M6502 cpu(memory.addressBus(), memory.dataBus(), tick);
+//   M6502 cpu(memory.addressBus(), memory.dataBus());
+// cpu.registerClockCallback(tick);
 
 //   current_path(xestr(SOURCE_DIR));
 //   std::ifstream infile(KlausInterrupt, std::ios::binary);
