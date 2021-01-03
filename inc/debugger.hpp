@@ -22,7 +22,7 @@ public:
   ~Debugger() = default;
 
   void step(instr::Instruction const &in, cpu::CpuState const &state,
-            mem::Bus<AddressT> &address_bus, mem::Bus<DataT> &data_bus);
+            mem::Mapper &mapper);
 
 private:
   bool break_;

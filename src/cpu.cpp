@@ -50,9 +50,7 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
   while (infile) {
     infile.get(next);
     try {
-      // writeByte(static_cast<AddressT>(curr++), next);
-      address_bus_.put(static_cast<AddressT>(curr++));
-      data_bus_.put(next);
+      mapper_.write(static_cast<AddressT>(curr++), next);
     } catch (std::runtime_error &e) {
       std::cerr << e.what() << std::endl;
       return false;
@@ -84,11 +82,10 @@ void M6502::step() {
   auto c = state_.cycle;
 
   DataT opcode = readByte(state_.pc);
-  instr::Instruction in(
-      opcode, state_.pc, c,
-      std::bind(&M6502::calculateAddress, this, std::placeholders::_1));
-  fireCallbacks(in);
-  state_.pc += in.size();
+  instr::Instruction in(opcode, state_.pc, c);
+
+  // TODO(oren): Remove/Replace (very expensive and only needed for EhBASIC)
+  // fireCallbacks(in);
   dispatch(in);
 }
 
@@ -109,19 +106,17 @@ void M6502::fireCallbacks(instr::Instruction const &in) {
 }
 
 M6502::DataT M6502::readByte(AddressT addr) {
-  address_bus_.put(addr);
-  auto b = data_bus_.get();
+  auto b = mapper_.read(addr);
   tick();
   return b;
 }
 
 void M6502::writeByte(AddressT addr, DataT data) {
-  address_bus_.put(addr);
-  data_bus_.put(data);
+  mapper_.write(addr, data);
   tick();
 }
 
-M6502::AddressT M6502::calculateAddress(instr::Instruction &in) {
+M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
   using instr::AddressMode;
   switch (in.addressMode()) {
   case AddressMode::accumulator:
@@ -172,34 +167,36 @@ M6502::AddressT M6502::wrapAroundOffset(AddressT base, uint8_t offset) {
 }
 
 void M6502::dispatch(instr::Instruction const &in) {
+  auto address = calculateAddress(in);
+  state_.pc += in.size();
   using instr::Operation;
   switch (in.operation()) {
   case Operation::loadA:
-    op_LD(state_.rA, in.address());
+    op_LD(state_.rA, address);
     break;
   case Operation::loadX:
-    op_LD(state_.rX, in.address());
+    op_LD(state_.rX, address);
     break;
   case Operation::loadY:
-    op_LD(state_.rY, in.address());
+    op_LD(state_.rY, address);
     break;
   case Operation::storeA:
-    op_ST(in.address(), state_.rA);
+    op_ST(address, state_.rA);
     break;
   case Operation::storeX:
-    op_ST(in.address(), state_.rX);
+    op_ST(address, state_.rX);
     break;
   case Operation::storeY:
-    op_ST(in.address(), state_.rY);
+    op_ST(address, state_.rY);
     break;
   case Operation::add:
-    op_ADC(in.address());
+    op_ADC(address);
     break;
   case Operation::subtract:
-    op_SBC(in.address());
+    op_SBC(address);
     break;
   case Operation::increment:
-    op_INC(in.address(), 1);
+    op_INC(address, 1);
     break;
   case Operation::incrementX:
     op_INR(state_.rX, 1);
@@ -208,7 +205,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, 1);
     break;
   case Operation::decrement:
-    op_INC(in.address(), -1);
+    op_INC(address, -1);
     break;
   case Operation::decrementX:
     op_INR(state_.rX, -1);
@@ -217,73 +214,73 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, -1);
     break;
   case Operation::shiftL:
-    op_ASL(in.address());
+    op_ASL(address);
     break;
   case Operation::shiftLA:
     op_ASLV(state_.rA);
     break;
   case Operation::shiftR:
-    op_LSR(in.address());
+    op_LSR(address);
     break;
   case Operation::shiftRA:
     op_LSRV(state_.rA);
     break;
   case Operation::rotateL:
-    op_ROL(in.address());
+    op_ROL(address);
     break;
   case Operation::rotateLA:
     op_ROLV(state_.rA);
     break;
   case Operation::rotateR:
-    op_ROR(in.address());
+    op_ROR(address);
     break;
   case Operation::rotateRA:
     op_RORV(state_.rA);
     break;
   case Operation::bwAND:
-    op_AND(in.address());
+    op_AND(address);
     break;
   case Operation::bwOR:
-    op_ORA(in.address());
+    op_ORA(address);
     break;
   case Operation::bwXOR:
-    op_EOR(in.address());
+    op_EOR(address);
     break;
   case Operation::compare:
-    op_CMP(state_.rA, in.address());
+    op_CMP(state_.rA, address);
     break;
   case Operation::compareX:
-    op_CMP(state_.rX, in.address());
+    op_CMP(state_.rX, address);
     break;
   case Operation::compareY:
-    op_CMP(state_.rY, in.address());
+    op_CMP(state_.rY, address);
     break;
   case Operation::bitTest:
-    op_BIT(in.address());
+    op_BIT(address);
     break;
   case Operation::branchPos:
-    op_BRClear(NEGATIVE_M, in.address());
+    op_BRClear(NEGATIVE_M, address);
     break;
   case Operation::branchVC:
-    op_BRClear(OVERFLOW_M, in.address());
+    op_BRClear(OVERFLOW_M, address);
     break;
   case Operation::branchCC:
-    op_BRClear(CARRY_M, in.address());
+    op_BRClear(CARRY_M, address);
     break;
   case Operation::branchNE:
-    op_BRClear(ZERO_M, in.address());
+    op_BRClear(ZERO_M, address);
     break;
   case Operation::branchNeg:
-    op_BRSet(NEGATIVE_M, in.address());
+    op_BRSet(NEGATIVE_M, address);
     break;
   case Operation::branchVS:
-    op_BRSet(OVERFLOW_M, in.address());
+    op_BRSet(OVERFLOW_M, address);
     break;
   case Operation::branchCS:
-    op_BRSet(CARRY_M, in.address());
+    op_BRSet(CARRY_M, address);
     break;
   case Operation::branchEQ:
-    op_BRSet(ZERO_M, in.address());
+    op_BRSet(ZERO_M, address);
     break;
   case Operation::transferAX:
     op_XFER(state_.rA, state_.rX);
@@ -305,11 +302,11 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_XFER(state_.rY, state_.rA);
     break;
   case Operation::jump:
-    state_.pc = in.address();
-    // op_JMP(in.address());
+    state_.pc = address;
+    // op_JMP(address);
     break;
   case Operation::jumpSR:
-    op_JSR(in.address());
+    op_JSR(address);
     break;
   case Operation::returnSR:
     op_RTS();

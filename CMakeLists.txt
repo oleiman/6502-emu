@@ -21,5 +21,6 @@ endif()
 
 
 if (WITH_TESTS)
+  target_link_libraries(6502-emu profiler)
   add_subdirectory(test)
 endif()

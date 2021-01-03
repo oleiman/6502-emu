@@ -25,8 +25,7 @@ Debugger::Debugger(bool should_break, bool trace)
     : break_(should_break), trace_(trace), step_(false), iter_(0) {}
 
 void Debugger::step(Instruction const &in, CpuState const &state,
-                    mem::Bus<AddressT> &address_bus,
-                    mem::Bus<DataT> &data_bus) {
+                    mem::Mapper &mapper) {
 
   if (step_) {
     cout << in << endl;
@@ -67,9 +66,8 @@ void Debugger::step(Instruction const &in, CpuState const &state,
       step_ = true;
     } else if (command.find("examine") == 0 || command[0] == 'e') {
       auto addr = extract_addr(command);
-      address_bus.put(addr);
       cout << "[" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex
-           << setfill('0') << setw(2) << +data_bus.get() << endl;
+           << setfill('0') << setw(2) << +mapper.read(addr) << endl;
     } else if (command.find("trace") == 0 || command[0] == 't') {
       trace_ = true;
     } else if (command.find("iter") == 0 || command[0] == 'i') {

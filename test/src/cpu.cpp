@@ -19,16 +19,14 @@ using std::filesystem::current_path;
 
 using cpu::M6502;
 using mem::ArrayMapper;
-using mem::VRam;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
-  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
-  VRam memory(mp);
+  ArrayMapper mp;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(mp);
   cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
@@ -42,20 +40,22 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
     cpu.step();
   } while (cpu.pc() != 0x45c0);
 
-  memory.addressBus().put(0x0210);
-  REQUIRE(memory.dataBus().get() == 0xff);
+  REQUIRE(mp.read(0x0210) == 0xff);
 
   std::cerr << report(AllSuiteA, cycles, instructions).str() << std::endl;
 }
 
+// NOTE(oren): wall clock before memory refactor: 16.601s
+// ~5.8 MHz
+// After removing junk code: 10.722
+// ~8.97 MHz (and that's with virtual function calls)
 TEST_CASE("KlausFunctional", "[integration][cpu]") {
-  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
-  VRam memory(mp);
+  ArrayMapper mp;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(mp);
   cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
@@ -81,13 +81,12 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
 }
 
 TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
-  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
-  VRam memory(mp);
+  ArrayMapper mp;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(mp);
   cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
@@ -115,13 +114,12 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
 }
 
 TEST_CASE("Timing", "[cpu][timing]") {
-  ArrayMapper<M6502::AddressT, M6502::DataT> mp;
-  VRam memory(mp);
+  ArrayMapper mp;
   int cycles = 0;
   int instructions = 0;
   auto tick = [&cycles]() { ++cycles; };
 
-  M6502 cpu(memory.addressBus(), memory.dataBus());
+  M6502 cpu(mp);
   cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
@@ -158,7 +156,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
 
 // TODO(oren): assemble this test
 // TEST_CASE("KlausInterrupt", "[integration][cpu]") {
-//   Ram<ArrayMapper<M6502::AddressT, M6502::DataT>> memory;
+//   Ram<ArrayMapper> memory;
 //   int cycles = 0;
 //   int instructions = 0;
 //   auto tick = [&cycles]() { ++cycles; };

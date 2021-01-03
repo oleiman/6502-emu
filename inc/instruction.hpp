@@ -92,15 +92,17 @@ class Instruction {
   using DataT = uint8_t;
 
 public:
-  explicit Instruction(DataT opcode, AddressT pc, unsigned long long cycle,
-                       std::function<AddressT(Instruction &)> calcAddr);
+  explicit Instruction(DataT opcode, AddressT pc, unsigned long long cycle);
   ~Instruction() = default;
 
   Operation operation() const { return operation_; }
   AddressMode addressMode() const { return address_mode_; }
   DataT size() const { return size_; }
   DataT opcode() const { return opcode_; }
+  /***Hack for easier debug output***/
   AddressT address() const { return address_; }
+  void setAddress(AddressT const addr) { address_ = addr; }
+  /**********************************/
   AddressT pc() const { return pc_; }
   unsigned long long cycle() const { return start_cycle_; }
 

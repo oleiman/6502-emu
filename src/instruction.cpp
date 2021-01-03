@@ -43,16 +43,15 @@ array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
     "ZeroX", "ZeroY", "Rel", "Indir", "IdxIndir", "IndirIdx",
 };
 
-Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle,
-                         function<AddressT(Instruction &)> calc_addr)
+Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
     : opcode_(opcode), size_(1), start_cycle_(cycle),
       address_mode_(AddressMode::implicit), operation_(Operation::illegal),
       pc_(pc) {
   decodeAddressMode();
   decodeOperation();
-  address_ = calc_addr(*this);
 }
 
+// TODO(oren): This is a very expensive lookup table.
 void Instruction::decodeAddressMode() {
   DataT lo = opcode_ & 0x0F;
   DataT hi = (opcode_ & 0xF0) >> 4;

@@ -34,10 +34,8 @@ public:
   // we can cover this use case with the memory mapper abstraction.
   using Callback = std::function<void(AddressT)>;
 
-  explicit M6502(mem::Bus<AddressT> &abus, mem::Bus<DataT> &mbus,
-                 bool enable_bcd = true)
-      : address_bus_(abus), data_bus_(mbus), clock_callback_([]() {}),
-        enable_bcd_(enable_bcd) {}
+  explicit M6502(mem::Mapper &mapper, bool enable_bcd = true)
+      : mapper_(mapper), clock_callback_([]() {}), enable_bcd_(enable_bcd) {}
 
   ~M6502() = default;
   bool loadRom(std::ifstream &infile, AddressT start);
@@ -63,14 +61,14 @@ public:
     // std::cerr << ss.str();
     auto c = state_.cycle;
     DataT opcode = readByte(state_.pc);
-    instr::Instruction in(
-        opcode, state_.pc, c,
-        std::bind(&M6502::calculateAddress, this, std::placeholders::_1));
+    instr::Instruction in(opcode, state_.pc, c);
 
-    debugger.step(in, state_, address_bus_, data_bus_);
+    // Yuck.
+    in.setAddress(calculateAddress(in));
+
+    debugger.step(in, state_, mapper_);
 
     fireCallbacks(in);
-    state_.pc += in.size();
     dispatch(in);
   }
 
@@ -87,8 +85,7 @@ private:
 
   CpuState state_;
 
-  mem::Bus<AddressT> &address_bus_;
-  mem::Bus<DataT> &data_bus_;
+  mem::Mapper &mapper_;
   std::function<void(void)> clock_callback_;
 
   bool pending_reset_ = false;
@@ -105,7 +102,7 @@ private:
   DataT readByte(AddressT addr);
   void writeByte(AddressT addr, DataT data);
 
-  AddressT calculateAddress(instr::Instruction &in);
+  AddressT calculateAddress(instr::Instruction const &in);
 
   // Compute offset address, tick clock if page boundary crossed
   AddressT penalizedOffset(AddressT base, uint8_t offset);
