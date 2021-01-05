@@ -494,6 +494,10 @@ ostream &operator<<(ostream &os, Instruction const &in) {
      << "0x" << hex << setfill('0') << setw(4) << +in.pc_ << "]\t"
      << opMnemonics[static_cast<int>(in.operation_)] << " ";
 
+  if (in.operation_ == Operation::illegal) {
+    ss << "(0x" << setfill('0') << setw(2) << +in.opcode_ << ") ";
+  }
+
   // TODO(oren): currently printing addresses in big endian
   switch (in.address_mode_) {
   case AddressMode::implicit:

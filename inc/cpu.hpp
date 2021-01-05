@@ -43,8 +43,8 @@ public:
   AddressT pc() const { return state_.pc; }
   void step();
   void reset();
-  // TODO(oren): should be private
   void nmi();
+  bool nmiPending() { return pending_nmi_; }
 
   std::function<void(void)> nmiPin();
 
@@ -82,6 +82,7 @@ private:
   }
   const static AddressT NMI_VEC = 0xFFFA;
   const static AddressT RST_VEC = 0xFFFC;
+  const static AddressT BRK_VEC = 0xFFFE;
 
   CpuState state_;
 
@@ -112,7 +113,7 @@ private:
   // TODO(oren): There's a good amount of code reuse here.
   // Good software engineering, not so good for the prospect
   // of migrating to a cycle-ticked architecture.
-  void op_Illegal(DataT opcode);
+  void op_Illegal(instr::Instruction const &in);
   void op_Interrupt(AddressT vec);
   void op_LD(DataT &dest, AddressT source);
   void op_ST(AddressT dest, DataT data);

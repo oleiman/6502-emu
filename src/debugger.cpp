@@ -66,7 +66,7 @@ void Debugger::step(Instruction const &in, CpuState const &state,
       step_ = true;
     } else if (command.find("examine") == 0 || command[0] == 'e') {
       auto addr = extract_addr(command);
-      cout << "[" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex
+      cout << "[0" << hex << setfill('0') << setw(4) << +addr << "]\t" << hex
            << setfill('0') << setw(2) << +mapper.read(addr) << endl;
     } else if (command.find("trace") == 0 || command[0] == 't') {
       trace_ = true;

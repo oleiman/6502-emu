@@ -33,9 +33,9 @@
 #define STACK_BASE 0x0100
 #define STACK_POINTER(X) (STACK_BASE | X)
 
-// #define NMI_VEC 0xFFFA
-// #define RST_VEC 0xFFFC
-#define BRK_VEC 0xFFFE
+// // #define NMI_VEC 0xFFFA
+// // #define RST_VEC 0xFFFC
+// #define BRK_VEC 0xFFFE
 
 namespace cpu {
 
@@ -83,6 +83,7 @@ void M6502::step() {
 
   DataT opcode = readByte(state_.pc);
   instr::Instruction in(opcode, state_.pc, c);
+  in.setAddress(calculateAddress(in));
 
   // TODO(oren): Remove/Replace (very expensive and only needed for EhBASIC)
   // fireCallbacks(in);
@@ -167,36 +168,35 @@ M6502::AddressT M6502::wrapAroundOffset(AddressT base, uint8_t offset) {
 }
 
 void M6502::dispatch(instr::Instruction const &in) {
-  auto address = calculateAddress(in);
   state_.pc += in.size();
   using instr::Operation;
   switch (in.operation()) {
   case Operation::loadA:
-    op_LD(state_.rA, address);
+    op_LD(state_.rA, in.address());
     break;
   case Operation::loadX:
-    op_LD(state_.rX, address);
+    op_LD(state_.rX, in.address());
     break;
   case Operation::loadY:
-    op_LD(state_.rY, address);
+    op_LD(state_.rY, in.address());
     break;
   case Operation::storeA:
-    op_ST(address, state_.rA);
+    op_ST(in.address(), state_.rA);
     break;
   case Operation::storeX:
-    op_ST(address, state_.rX);
+    op_ST(in.address(), state_.rX);
     break;
   case Operation::storeY:
-    op_ST(address, state_.rY);
+    op_ST(in.address(), state_.rY);
     break;
   case Operation::add:
-    op_ADC(address);
+    op_ADC(in.address());
     break;
   case Operation::subtract:
-    op_SBC(address);
+    op_SBC(in.address());
     break;
   case Operation::increment:
-    op_INC(address, 1);
+    op_INC(in.address(), 1);
     break;
   case Operation::incrementX:
     op_INR(state_.rX, 1);
@@ -205,7 +205,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, 1);
     break;
   case Operation::decrement:
-    op_INC(address, -1);
+    op_INC(in.address(), -1);
     break;
   case Operation::decrementX:
     op_INR(state_.rX, -1);
@@ -214,73 +214,73 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, -1);
     break;
   case Operation::shiftL:
-    op_ASL(address);
+    op_ASL(in.address());
     break;
   case Operation::shiftLA:
     op_ASLV(state_.rA);
     break;
   case Operation::shiftR:
-    op_LSR(address);
+    op_LSR(in.address());
     break;
   case Operation::shiftRA:
     op_LSRV(state_.rA);
     break;
   case Operation::rotateL:
-    op_ROL(address);
+    op_ROL(in.address());
     break;
   case Operation::rotateLA:
     op_ROLV(state_.rA);
     break;
   case Operation::rotateR:
-    op_ROR(address);
+    op_ROR(in.address());
     break;
   case Operation::rotateRA:
     op_RORV(state_.rA);
     break;
   case Operation::bwAND:
-    op_AND(address);
+    op_AND(in.address());
     break;
   case Operation::bwOR:
-    op_ORA(address);
+    op_ORA(in.address());
     break;
   case Operation::bwXOR:
-    op_EOR(address);
+    op_EOR(in.address());
     break;
   case Operation::compare:
-    op_CMP(state_.rA, address);
+    op_CMP(state_.rA, in.address());
     break;
   case Operation::compareX:
-    op_CMP(state_.rX, address);
+    op_CMP(state_.rX, in.address());
     break;
   case Operation::compareY:
-    op_CMP(state_.rY, address);
+    op_CMP(state_.rY, in.address());
     break;
   case Operation::bitTest:
-    op_BIT(address);
+    op_BIT(in.address());
     break;
   case Operation::branchPos:
-    op_BRClear(NEGATIVE_M, address);
+    op_BRClear(NEGATIVE_M, in.address());
     break;
   case Operation::branchVC:
-    op_BRClear(OVERFLOW_M, address);
+    op_BRClear(OVERFLOW_M, in.address());
     break;
   case Operation::branchCC:
-    op_BRClear(CARRY_M, address);
+    op_BRClear(CARRY_M, in.address());
     break;
   case Operation::branchNE:
-    op_BRClear(ZERO_M, address);
+    op_BRClear(ZERO_M, in.address());
     break;
   case Operation::branchNeg:
-    op_BRSet(NEGATIVE_M, address);
+    op_BRSet(NEGATIVE_M, in.address());
     break;
   case Operation::branchVS:
-    op_BRSet(OVERFLOW_M, address);
+    op_BRSet(OVERFLOW_M, in.address());
     break;
   case Operation::branchCS:
-    op_BRSet(CARRY_M, address);
+    op_BRSet(CARRY_M, in.address());
     break;
   case Operation::branchEQ:
-    op_BRSet(ZERO_M, address);
+    op_BRSet(ZERO_M, in.address());
     break;
   case Operation::transferAX:
     op_XFER(state_.rA, state_.rX);
@@ -302,11 +302,11 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_XFER(state_.rY, state_.rA);
     break;
   case Operation::jump:
-    state_.pc = address;
-    // op_JMP(address);
+    state_.pc = in.address();
+    // op_JMP(in.address());
     break;
   case Operation::jumpSR:
-    op_JSR(address);
+    op_JSR(in.address());
     break;
   case Operation::returnSR:
     op_RTS();
@@ -354,16 +354,18 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_NOP();
     break;
   default:
-    op_Illegal(in.opcode());
+    op_Illegal(in);
     break;
   }
 }
 
-void M6502::op_Illegal(DataT opcode) {
+void M6502::op_Illegal(instr::Instruction const &in) {
   std::stringstream ss;
-  ss << "[0x" << std::hex << state_.pc << "] "
-     << "Illegal Opcode: <0x" << std::hex << std::setfill('0') << std::setw(2)
-     << +opcode << ">";
+  ss << "Illegal Opcode: " << in;
+  // ss << "[0x" << std::hex << state_.pc << "] "
+  //    << "Illegal Opcode: <0x" << std::hex << std::setfill('0') <<
+  //    std::setw(2)
+  //    << +opcode << ">";
   throw std::runtime_error(ss.str());
 }
 
