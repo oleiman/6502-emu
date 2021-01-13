@@ -35,20 +35,21 @@ public:
   using Callback = std::function<void(AddressT)>;
 
   explicit M6502(mem::Mapper &mapper, bool enable_bcd = true)
-      : mapper_(mapper), clock_callback_([]() {}), enable_bcd_(enable_bcd) {}
+      : mapper_(mapper), enable_bcd_(enable_bcd) {}
 
   ~M6502() = default;
   bool loadRom(std::ifstream &infile, AddressT start);
   void initPc(AddressT val) { state_.pc = val; }
-  AddressT pc() const { return state_.pc; }
-  void step();
+  uint8_t step();
   void reset();
   void nmi();
   bool nmiPending() { return pending_nmi_; }
+  CpuState const &state() { return state_; }
 
   std::function<void(void)> nmiPin();
 
-  template <class Debugger> void debugStep(Debugger &debugger) {
+  template <class Debugger> uint8_t debugStep(Debugger &debugger) {
+    step_cycles_ = 0;
     if (pending_nmi_) {
       op_Interrupt(NMI_VEC);
       pending_nmi_ = false;
@@ -56,38 +57,36 @@ public:
       op_Interrupt(RST_VEC);
       pending_reset_ = false;
     }
-    // std::stringstream ss;
-    // ss << std::hex << state_.pc << std::endl;
-    // std::cerr << ss.str();
     auto c = state_.cycle;
     DataT opcode = readByte(state_.pc);
     instr::Instruction in(opcode, state_.pc, c);
 
     // Yuck.
-    in.setAddress(calculateAddress(in));
+    in.address = calculateAddress(in);
 
     debugger.step(in, state_, mapper_);
 
     fireCallbacks(in);
     dispatch(in);
+
+    return step_cycles_;
   }
 
   void registerCallback(instr::Operation op, Callback c);
-  void registerClockCallback(std::function<void(void)> tick);
 
 private:
   void tick() {
     ++state_.cycle;
-    clock_callback_();
+    ++step_cycles_;
   }
   const static AddressT NMI_VEC = 0xFFFA;
   const static AddressT RST_VEC = 0xFFFC;
   const static AddressT BRK_VEC = 0xFFFE;
 
   CpuState state_;
+  uint8_t step_cycles_;
 
   mem::Mapper &mapper_;
-  std::function<void(void)> clock_callback_;
 
   bool pending_reset_ = false;
   bool pending_nmi_ = false;

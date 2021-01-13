@@ -22,12 +22,9 @@ using mem::ArrayMapper;
 
 TEST_CASE("AllSuiteA", "[integration][cpu]") {
   ArrayMapper mp;
-  int cycles = 0;
   int instructions = 0;
-  auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(mp);
-  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(AllSuiteA, std::ios::binary);
@@ -38,11 +35,12 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
   do {
     ++instructions;
     cpu.step();
-  } while (cpu.pc() != 0x45c0);
+  } while (cpu.state().pc != 0x45c0);
 
   REQUIRE(mp.read(0x0210) == 0xff);
 
-  std::cerr << report(AllSuiteA, cycles, instructions).str() << std::endl;
+  std::cerr << report(AllSuiteA, cpu.state().cycle, instructions).str()
+            << std::endl;
 }
 
 // NOTE(oren): wall clock before memory refactor: 16.601s
@@ -51,12 +49,9 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
 // ~8.97 MHz (and that's with virtual function calls)
 TEST_CASE("KlausFunctional", "[integration][cpu]") {
   ArrayMapper mp;
-  int cycles = 0;
   int instructions = 0;
-  auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(mp);
-  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(KlausFunctional, std::ios::binary);
@@ -71,23 +66,21 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
       // cpu.debugStep(d);
       ++instructions;
       cpu.step();
-    } while (cpu.pc() != 0x3469);
+    } while (cpu.state().pc != 0x3469);
   } catch (std::runtime_error e) {
     std::cerr << e.what() << std::endl;
   }
 
-  REQUIRE(cpu.pc() == 0x3469);
-  std::cerr << report(KlausFunctional, cycles, instructions).str() << std::endl;
+  REQUIRE(cpu.state().pc == 0x3469);
+  std::cerr << report(KlausFunctional, cpu.state().cycle, instructions).str()
+            << std::endl;
 }
 
 TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
   ArrayMapper mp;
-  int cycles = 0;
   int instructions = 0;
-  auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(mp);
-  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(BruceClarkDecimal, std::ios::binary);
@@ -102,25 +95,22 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
       // cpu.debugStep(d);
       ++instructions;
       cpu.step();
-    } while (cpu.pc() != 0x025b);
+    } while (cpu.state().pc != 0x025b);
   } catch (std::runtime_error e) {
     std::cerr << e.what() << std::endl;
   }
 
-  REQUIRE(cpu.pc() == 0x025b);
-  // REQUIRE(cycles == 7915081);
-  std::cerr << report(BruceClarkDecimal, cycles, instructions).str()
+  REQUIRE(cpu.state().pc == 0x025b);
+  // REQUIRE(cpu.state().cycle == 7915081);
+  std::cerr << report(BruceClarkDecimal, cpu.state().cycle, instructions).str()
             << std::endl;
 }
 
 TEST_CASE("Timing", "[cpu][timing]") {
   ArrayMapper mp;
-  int cycles = 0;
   int instructions = 0;
-  auto tick = [&cycles]() { ++cycles; };
 
   M6502 cpu(mp);
-  cpu.registerClockCallback(tick);
 
   current_path(xestr(SOURCE_DIR));
   std::ifstream infile(Timing, std::ios::binary);
@@ -135,12 +125,12 @@ TEST_CASE("Timing", "[cpu][timing]") {
       // cpu.debugStep(d);
       ++instructions;
       cpu.step();
-    } while (cpu.pc() != 0x1269);
+    } while (cpu.state().pc != 0x1269);
   } catch (std::runtime_error e) {
     std::cerr << e.what() << std::endl;
   }
 
-  REQUIRE(cpu.pc() == 0x1269);
+  REQUIRE(cpu.state().pc == 0x1269);
 
   // cycle count here is somewhat arbitrary in that it just reflects the current
   // state of this emulation.
@@ -150,19 +140,16 @@ TEST_CASE("Timing", "[cpu][timing]") {
   // with the latter recommended as a reasonable source of "truth"
   // fairly certain this doesn't include the final jump back to the start
   // so I'm going to say we've hit our target here
-  REQUIRE(cycles == 1141);
-  std::cerr << report(Timing, cycles, instructions).str() << std::endl;
+  REQUIRE(cpu.state().cycle == 1141);
+  std::cerr << report(Timing, cpu.state().cycle, instructions).str()
+            << std::endl;
 }
 
 // TODO(oren): assemble this test
 // TEST_CASE("KlausInterrupt", "[integration][cpu]") {
 //   Ram<ArrayMapper> memory;
-//   int cycles = 0;
 //   int instructions = 0;
-//   auto tick = [&cycles]() { ++cycles; };
-
 //   M6502 cpu(memory.addressBus(), memory.dataBus());
-// cpu.registerClockCallback(tick);
 
 //   current_path(xestr(SOURCE_DIR));
 //   std::ifstream infile(KlausInterrupt, std::ios::binary);
@@ -177,12 +164,12 @@ TEST_CASE("Timing", "[cpu][timing]") {
 //       // cpu.debugStep(d);
 //       ++instructions;
 //       cpu.step();
-//     } while (cpu.pc() != 0x025b);
+//     } while (cpu.state().pc != 0x025b);
 //   } catch (std::runtime_error e) {
 //     std::cerr << e.what() << std::endl;
 //   }
 
-//   REQUIRE(cpu.pc() == 0x025b);
-//   std::cerr << report(KlausInterrupt, cycles, instructions).str() <<
-//   std::endl;
+//   REQUIRE(cpu.state().pc == 0x025b);
+//   std::cerr << report(KlausInterrupt, cpu.state().cycle, instructions).str()
+//   << std::endl;
 // }

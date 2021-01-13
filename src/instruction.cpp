@@ -44,149 +44,131 @@ array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
 };
 
 Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
-    : opcode_(opcode), size_(1), start_cycle_(cycle), pc_(pc),
-      address_mode_(AddressMode::implicit), operation_(Operation::illegal) {
-  decodeAddressMode();
-  decodeOperation();
-}
+    : opcode(opcode), issueCycle(cycle), pc(pc),
+      addressMode(decodeAddressMode()),
+      size(aModeSizes[static_cast<int>(addressMode)]),
+      operation(decodeOperation()) {}
 
-// TODO(oren): This is a very expensive lookup table.
-void Instruction::decodeAddressMode() {
-  DataT lo = opcode_ & 0x0F;
-  DataT hi = (opcode_ & 0xF0) >> 4;
+// TODO(oren): This is a very expensive lookup table. Refactor.
+AddressMode Instruction::decodeAddressMode() {
+  DataT lo = opcode & 0x0F;
+  DataT hi = (opcode & 0xF0) >> 4;
 
   switch (lo) {
   case 0x00:
     if (hi == 0x00 || hi == 0x04 || hi == 0x06) {
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     } else if (hi == 0x02) {
-      address_mode_ = AddressMode::absolute;
-      size_ = 3;
+      return AddressMode::absolute;
     } else if ((hi & 0x01) == 0) {
       // NOTE: 0x80 is unofficial nop
-      address_mode_ = AddressMode::immediate;
-      size_ = 2;
+      return AddressMode::immediate;
     } else {
-      address_mode_ = AddressMode::relative;
+      return AddressMode::relative;
     }
-    break;
   case 0x01:
     if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::indexedIndirect;
+      return AddressMode::indexedIndirect;
     } else {
-      address_mode_ = AddressMode::indirectIndexed;
+      return AddressMode::indirectIndexed;
     }
-    break;
   case 0x02:
     if (hi == 0x0A) {
-      address_mode_ = AddressMode::immediate;
+      return AddressMode::immediate;
     } else {
       // NOTE: rest are illegal
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     }
-    break;
   case 0x03:
     // NOTE: all illegal
-    address_mode_ = AddressMode::implicit;
-    break;
+    return AddressMode::implicit;
   case 0x04:
     if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::zeroPage;
+      return AddressMode::zeroPage;
     } else {
       // includes 0x14, unofficial zpx nop
-      address_mode_ = AddressMode::zeroPageX;
+      return AddressMode::zeroPageX;
     }
-    break;
   case 0x05:
     if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::zeroPage;
+      return AddressMode::zeroPage;
     } else {
-      address_mode_ = AddressMode::zeroPageX;
+      return AddressMode::zeroPageX;
     }
-    break;
   case 0x06:
     if (hi == 0x09 || hi == 0x0B) {
-      address_mode_ = AddressMode::zeroPageY;
+      return AddressMode::zeroPageY;
     } else if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::zeroPage;
+      return AddressMode::zeroPage;
     } else {
-      address_mode_ = AddressMode::zeroPageX;
+      return AddressMode::zeroPageX;
     }
-    break;
   case 0x07:
     // NOTE: all illegal
-    address_mode_ = AddressMode::implicit;
-    break;
+    return AddressMode::implicit;
   case 0x08:
-    address_mode_ = AddressMode::implicit;
-    break;
+    return AddressMode::implicit;
   case 0x09:
     if (hi == 0x08) {
       // NOTE: illegal
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     } else if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::immediate;
+      return AddressMode::immediate;
     } else {
-      address_mode_ = AddressMode::absoluteY;
+      return AddressMode::absoluteY;
     }
-    break;
   case 0x0A:
     if ((hi & 0x01) == 0 && hi < 0x08) {
-      address_mode_ = AddressMode::accumulator;
+      return AddressMode::accumulator;
     } else {
       // NOTE: 1, 3, 5, 7, D, F unofficial
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     }
-    break;
   case 0x0B:
     // NOTE: all either illegal or unofficial
     if (hi == 0x0E) { // unofficial SBC immediate
-      address_mode_ = AddressMode::immediate;
+      return AddressMode::immediate;
     } else {
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     }
 
-    break;
   case 0x0C:
     if (hi == 0x06) {
-      address_mode_ = AddressMode::indirect;
+      return AddressMode::indirect;
     } else if (hi & 0x01) {
       // some are unofficial
-      address_mode_ = AddressMode::absoluteX;
+      return AddressMode::absoluteX;
     } else {
       // NOTE: some are unofficial, but all are absolute
-      address_mode_ = AddressMode::absolute;
+      return AddressMode::absolute;
     }
-    break;
   case 0x0D:
     if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::absolute;
+      return AddressMode::absolute;
     } else {
-      address_mode_ = AddressMode::absoluteX;
+      return AddressMode::absoluteX;
     }
-    break;
   case 0x0E:
     if (hi == 0x09) {
       // NOTE: illegal
-      address_mode_ = AddressMode::implicit;
+      return AddressMode::implicit;
     } else if (hi == 0x0B) {
-      address_mode_ = AddressMode::absoluteY;
+      return AddressMode::absoluteY;
     } else if ((hi & 0x01) == 0) {
-      address_mode_ = AddressMode::absolute;
+      return AddressMode::absolute;
     } else {
-      address_mode_ = AddressMode::absoluteX;
+      return AddressMode::absoluteX;
     }
-    break;
   case 0x0F:
     // NOTE: all illegal
-    address_mode_ = AddressMode::implicit;
+    return AddressMode::implicit;
+  default:
+    return AddressMode::implicit;
   }
-
-  size_ = aModeSizes[static_cast<int>(address_mode_)];
 }
 
-void Instruction::decodeOperation() {
-  switch (opcode_) {
+Operation Instruction::decodeOperation() {
+  switch (opcode) {
   case 0xA1:
   case 0xA5:
   case 0xA9:
@@ -195,30 +177,26 @@ void Instruction::decodeOperation() {
   case 0xB5:
   case 0xB9:
   case 0xBD:
-    operation_ = Operation::loadA;
-    break;
+    return Operation::loadA;
   case 0xA2:
   case 0xA6:
   case 0xAE:
   case 0xB6:
   case 0xBE:
-    operation_ = Operation::loadX;
-    break;
+    return Operation::loadX;
   case 0xA0:
   case 0xA4:
   case 0xAC:
   case 0xB4:
   case 0xBC:
-    operation_ = Operation::loadY;
-    break;
+    return Operation::loadY;
   case 0xA7:
   case 0xB7:
   case 0xAF:
   case 0xBF:
   case 0xA3:
   case 0xB3:
-    operation_ = Operation::loadAX;
-    break;
+    return Operation::loadAX;
   case 0x81:
   case 0x85:
   case 0x8D:
@@ -226,18 +204,15 @@ void Instruction::decodeOperation() {
   case 0x95:
   case 0x99:
   case 0x9D:
-    operation_ = Operation::storeA;
-    break;
+    return Operation::storeA;
   case 0x86:
   case 0x8E:
   case 0x96:
-    operation_ = Operation::storeX;
-    break;
+    return Operation::storeX;
   case 0x84:
   case 0x8C:
   case 0x94:
-    operation_ = Operation::storeY;
-    break;
+    return Operation::storeY;
   case 0x61:
   case 0x65:
   case 0x69:
@@ -246,8 +221,7 @@ void Instruction::decodeOperation() {
   case 0x75:
   case 0x79:
   case 0x7D:
-    operation_ = Operation::add;
-    break;
+    return Operation::add;
   case 0xE1:
   case 0xE5:
   case 0xE9:
@@ -257,68 +231,53 @@ void Instruction::decodeOperation() {
   case 0xF5:
   case 0xF9:
   case 0xFD:
-    operation_ = Operation::subtract;
-    break;
+    return Operation::subtract;
   case 0xE6:
   case 0xEE:
   case 0xF6:
   case 0xFE:
-    operation_ = Operation::increment;
-    break;
+    return Operation::increment;
   case 0xE8:
-    operation_ = Operation::incrementX;
-    break;
+    return Operation::incrementX;
   case 0xC8:
-    operation_ = Operation::incrementY;
-    break;
+    return Operation::incrementY;
   case 0xC6:
   case 0xCE:
   case 0xD6:
   case 0xDE:
-    operation_ = Operation::decrement;
-    break;
+    return Operation::decrement;
   case 0xCA:
-    operation_ = Operation::decrementX;
-    break;
+    return Operation::decrementX;
   case 0x88:
-    operation_ = Operation::decrementY;
-    break;
+    return Operation::decrementY;
   case 0x06:
   case 0x0E:
   case 0x16:
   case 0x1E:
-    operation_ = Operation::shiftL;
-    break;
+    return Operation::shiftL;
   case 0x0A:
-    operation_ = Operation::shiftLA;
-    break;
+    return Operation::shiftLA;
   case 0x46:
   case 0x4E:
   case 0x56:
   case 0x5E:
-    operation_ = Operation::shiftR;
-    break;
+    return Operation::shiftR;
   case 0x4A:
-    operation_ = Operation::shiftRA;
-    break;
+    return Operation::shiftRA;
   case 0x26:
   case 0x2E:
   case 0x36:
   case 0x3E:
-    operation_ = Operation::rotateL;
-    break;
+    return Operation::rotateL;
   case 0x2A:
-    operation_ = Operation::rotateLA;
-    break;
+    return Operation::rotateLA;
   case 0x66:
   case 0x6E:
   case 0x76:
   case 0x7E:
-    operation_ = Operation::rotateR;
-    break;
+    return Operation::rotateR;
   case 0x6A:
-    operation_ = Operation::rotateRA;
-    break;
+    return Operation::rotateRA;
   case 0x21:
   case 0x25:
   case 0x29:
@@ -327,8 +286,7 @@ void Instruction::decodeOperation() {
   case 0x35:
   case 0x39:
   case 0x3D:
-    operation_ = Operation::bwAND;
-    break;
+    return Operation::bwAND;
   case 0x01:
   case 0x05:
   case 0x09:
@@ -337,8 +295,7 @@ void Instruction::decodeOperation() {
   case 0x15:
   case 0x19:
   case 0x1D:
-    operation_ = Operation::bwOR;
-    break;
+    return Operation::bwOR;
   case 0x41:
   case 0x45:
   case 0x49:
@@ -347,8 +304,7 @@ void Instruction::decodeOperation() {
   case 0x55:
   case 0x59:
   case 0x5D:
-    operation_ = Operation::bwXOR;
-    break;
+    return Operation::bwXOR;
   case 0xC1:
   case 0xC5:
   case 0xC9:
@@ -357,113 +313,79 @@ void Instruction::decodeOperation() {
   case 0xD5:
   case 0xD9:
   case 0xDD:
-    operation_ = Operation::compare;
-    break;
+    return Operation::compare;
   case 0xE0:
   case 0xE4:
   case 0xEC:
-    operation_ = Operation::compareX;
-    break;
+    return Operation::compareX;
   case 0xC0:
   case 0xC4:
   case 0xCC:
-    operation_ = Operation::compareY;
-    break;
+    return Operation::compareY;
   case 0x24:
   case 0x2C:
-    operation_ = Operation::bitTest;
-    break;
+    return Operation::bitTest;
   case 0x10:
-    operation_ = Operation::branchPos;
-    break;
+    return Operation::branchPos;
   case 0x50:
-    operation_ = Operation::branchVC;
-    break;
+    return Operation::branchVC;
   case 0x90:
-    operation_ = Operation::branchCC;
-    break;
+    return Operation::branchCC;
   case 0xD0:
-    operation_ = Operation::branchNE;
-    break;
+    return Operation::branchNE;
   case 0x30:
-    operation_ = Operation::branchNeg;
-    break;
+    return Operation::branchNeg;
   case 0x70:
-    operation_ = Operation::branchVS;
-    break;
+    return Operation::branchVS;
   case 0xB0:
-    operation_ = Operation::branchCS;
-    break;
+    return Operation::branchCS;
   case 0xF0:
-    operation_ = Operation::branchEQ;
-    break;
+    return Operation::branchEQ;
   case 0xAA:
-    operation_ = Operation::transferAX;
-    break;
+    return Operation::transferAX;
   case 0xA8:
-    operation_ = Operation::transferAY;
-    break;
+    return Operation::transferAY;
   case 0xBA:
-    operation_ = Operation::transferSX;
-    break;
+    return Operation::transferSX;
   case 0x8A:
-    operation_ = Operation::transferXA;
-    break;
+    return Operation::transferXA;
   case 0x9A:
-    operation_ = Operation::transferXS;
-    break;
+    return Operation::transferXS;
   case 0x98:
-    operation_ = Operation::transferYA;
-    break;
+    return Operation::transferYA;
   case 0x4C:
   case 0x6C:
-    operation_ = Operation::jump;
-    break;
+    return Operation::jump;
   case 0x20:
-    operation_ = Operation::jumpSR;
-    break;
+    return Operation::jumpSR;
   case 0x60:
-    operation_ = Operation::returnSR;
-    break;
+    return Operation::returnSR;
   case 0x40:
-    operation_ = Operation::returnINT;
-    break;
+    return Operation::returnINT;
   case 0x48:
-    operation_ = Operation::pushA;
-    break;
+    return Operation::pushA;
   case 0x68:
-    operation_ = Operation::pullA;
-    break;
+    return Operation::pullA;
   case 0x08:
-    operation_ = Operation::pushS;
-    break;
+    return Operation::pushS;
   case 0x28:
-    operation_ = Operation::pullS;
-    break;
+    return Operation::pullS;
   case 0x00:
-    operation_ = Operation::forceBreak;
-    break;
+    return Operation::forceBreak;
   case 0x18:
-    operation_ = Operation::clearC;
-    break;
+    return Operation::clearC;
   case 0x58:
-    operation_ = Operation::clearI;
-    break;
+    return Operation::clearI;
   case 0xB8:
-    operation_ = Operation::clearV;
-    break;
+    return Operation::clearV;
   case 0xD8:
-    operation_ = Operation::clearD;
-    break;
+    return Operation::clearD;
   case 0x38:
-    operation_ = Operation::setC;
-    break;
+    return Operation::setC;
   case 0x78:
-    operation_ = Operation::setI;
-    break;
+    return Operation::setI;
   case 0xF8:
-    operation_ = Operation::setD;
-    break;
+    return Operation::setD;
   case 0x80:
   case 0x0C:
   case 0x1C:
@@ -488,36 +410,35 @@ void Instruction::decodeOperation() {
   case 0xDA:
   case 0xEA:
   case 0xFA:
-    operation_ = Operation::nop;
-    break;
+    return Operation::nop;
   default:
-    operation_ = Operation::illegal;
+    return Operation::illegal;
   }
 }
 
 ostream &operator<<(ostream &os, Instruction const &in) {
   stringstream ss;
   ss << "["
-     << "0x" << hex << setfill('0') << setw(4) << +in.pc_ << "]\t"
-     << opMnemonics[static_cast<int>(in.operation_)] << " ";
+     << "0x" << hex << setfill('0') << setw(4) << +in.pc << "]\t"
+     << opMnemonics[static_cast<int>(in.operation)] << " ";
 
-  if (in.operation_ == Operation::illegal) {
-    ss << "(0x" << setfill('0') << setw(2) << +in.opcode_ << ") ";
+  if (in.operation == Operation::illegal) {
+    ss << "(0x" << setfill('0') << setw(2) << +in.opcode << ") ";
   }
 
   // TODO(oren): currently printing addresses in big endian
-  switch (in.address_mode_) {
+  switch (in.addressMode) {
   case AddressMode::implicit:
     break;
   case AddressMode::accumulator:
     ss << "A";
     break;
   default:
-    ss << "$" << setw(4) << +in.address_ << " ("
-       << aModeMnemonics[static_cast<int>(in.address_mode_)] << ")";
+    ss << "$" << setw(4) << +in.address << " ("
+       << aModeMnemonics[static_cast<int>(in.addressMode)] << ")";
     break;
   }
-  ss << " C: " << std::dec << in.start_cycle_ + 7;
+  ss << " C: " << std::dec << in.issueCycle + 7;
   os << ss.str();
   return os;
 }

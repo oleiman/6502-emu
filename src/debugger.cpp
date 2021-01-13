@@ -91,7 +91,7 @@ Debugger::AddressT Debugger::extract_addr(string const &command) {
 }
 
 bool BreakPoint::shouldBreak(Instruction const &in) const {
-  if (in.pc() == pc_) {
+  if (in.pc == pc_) {
     return true;
   }
   return false;

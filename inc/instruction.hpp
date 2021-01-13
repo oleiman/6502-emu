@@ -88,38 +88,26 @@ enum class Operation {
   nOperations
 };
 
-class Instruction {
+struct Instruction {
   using AddressT = uint16_t;
   using DataT = uint8_t;
 
-public:
   explicit Instruction(DataT opcode, AddressT pc, unsigned long long cycle);
   ~Instruction() = default;
 
-  Operation operation() const { return operation_; }
-  AddressMode addressMode() const { return address_mode_; }
-  DataT size() const { return size_; }
-  DataT opcode() const { return opcode_; }
-  /***Hack for easier debug output***/
-  AddressT address() const { return address_; }
-  void setAddress(AddressT const addr) { address_ = addr; }
-  /**********************************/
-  AddressT pc() const { return pc_; }
-  unsigned long long cycle() const { return start_cycle_; }
-
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
-private:
-  DataT opcode_;
-  DataT size_;
-  unsigned long long start_cycle_;
-  AddressT pc_;
-  AddressMode address_mode_;
-  Operation operation_;
-  AddressT address_;
+  const DataT opcode;
+  const unsigned long long issueCycle;
+  const AddressT pc;
+  const AddressMode addressMode;
+  const DataT size;
+  const Operation operation;
+  AddressT address = 0x0000;
 
-  void decodeAddressMode();
-  void decodeOperation();
+private:
+  AddressMode decodeAddressMode();
+  Operation decodeOperation();
 };
 
 } // namespace instr
