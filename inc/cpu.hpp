@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -15,7 +16,7 @@ struct CpuState {
   // TODO(oren): manual indicates that SP is initialized by
   // the programmer...
   explicit CpuState()
-      : rA(0x00), rX(0x00), rY(0x00), sp(0xFF), pc(0x0000), status(0x0000),
+      : rA(0x00), rX(0x00), rY(0x00), sp(0x00), pc(0x0000), status(0x0000),
         cycle(0) {}
   uint8_t rA;               // Accumulator
   uint8_t rX;               // Index Register X
@@ -42,6 +43,7 @@ public:
   void initPc(AddressT val) { state_.pc = val; }
   uint8_t step();
   void reset();
+  void reset(AddressT init);
   void nmi();
   bool nmiPending() { return pending_nmi_; }
   CpuState const &state() { return state_; }
@@ -51,6 +53,8 @@ public:
   template <class Debugger> uint8_t debugStep(Debugger &debugger) {
     step_cycles_ = 0;
     if (pending_nmi_) {
+      std::cout << "Jump to NMI_VEC from: " << std::hex << state_.pc
+                << std::endl;
       op_Interrupt(NMI_VEC);
       pending_nmi_ = false;
     } else if (pending_reset_) {
@@ -91,6 +95,8 @@ private:
   bool pending_reset_ = false;
   bool pending_nmi_ = false;
   bool enable_bcd_;
+  bool rst_override_ = false;
+  AddressT init_pc_ = 0;
 
   AddressT code_start_;
   std::unordered_map<instr::Operation, std::vector<Callback>> callbacks_;

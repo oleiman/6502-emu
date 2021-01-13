@@ -30,7 +30,8 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
   std::ifstream infile(AllSuiteA, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x4000));
   infile.close();
-  cpu.initPc(0x4000);
+  // TODO(oren): finalize the decision to use reset rather than initPC here
+  cpu.reset(0x4000);
 
   do {
     ++instructions;
@@ -53,7 +54,7 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
   std::ifstream infile(KlausFunctional, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x0000u));
   infile.close();
-  cpu.initPc(0x400u);
+  cpu.reset(0x400u);
 
   dbg::Debugger d(true, false);
 
@@ -82,7 +83,7 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
   std::ifstream infile(BruceClarkDecimal, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x0200u));
   infile.close();
-  cpu.initPc(0x200u);
+  cpu.reset(0x200u);
 
   // dbg::Debugger d(true, false);
 
@@ -112,7 +113,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
   std::ifstream infile(Timing, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x1000));
   infile.close();
-  cpu.initPc(0x1000);
+  cpu.reset(0x1000);
 
   // dbg::Debugger d(true, false);
 
@@ -136,7 +137,9 @@ TEST_CASE("Timing", "[cpu][timing]") {
   // with the latter recommended as a reasonable source of "truth"
   // fairly certain this doesn't include the final jump back to the start
   // so I'm going to say we've hit our target here
-  REQUIRE(cpu.state().cycle == 1141);
+  // NOTE(oren): subtracting 7 here on account of updated reset logic. could be
+  // wrong.
+  REQUIRE(cpu.state().cycle - 7 == 1141);
   std::cerr << report(Timing, cpu.state().cycle, instructions).str()
             << std::endl;
 }
@@ -151,7 +154,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
 //   std::ifstream infile(KlausInterrupt, std::ios::binary);
 //   REQUIRE(cpu.loadRom(infile, 0x0000u));
 //   infile.close();
-//   cpu.initPc(0x400u);
+//   cpu.reset(0x400u);
 
 //   // dbg::Debugger d(true, false);
 

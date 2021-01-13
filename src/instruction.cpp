@@ -30,13 +30,13 @@ array<uint8_t, static_cast<int>(AddressMode::nAddressModes)> aModeSizes = {
 };
 
 array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
-    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "ADC",
-    "SBC",     "INC", "INX", "INY", "DEC", "DEX", "DEY", "ASL", "ASL",
-    "LSR",     "LSR", "ROL", "ROL", "ROR", "ROR", "AND", "ORA", "EOR",
-    "CMP",     "CPX", "CPY", "BIT", "BPL", "BVC", "BCC", "BNE", "BMI",
-    "BVS",     "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS", "TYA",
-    "JMP",     "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK",
-    "CLC",     "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
+    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "SAX",
+    "ADC",     "SBC", "INC", "INX", "INY", "DEC", "DEX", "DEY", "ASL",
+    "ASL",     "LSR", "LSR", "ROL", "ROL", "ROR", "ROR", "AND", "ORA",
+    "EOR",     "CMP", "CPX", "CPY", "BIT", "BPL", "BVC", "BCC", "BNE",
+    "BMI",     "BVS", "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS",
+    "TYA",     "JMP", "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP",
+    "BRK",     "CLC", "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
 array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
     "Imp",   "Accum", "Imm", "Abs",   "AbsX",     "AbsY",     "Zero",
@@ -73,7 +73,8 @@ AddressMode Instruction::decodeAddressMode() {
       return AddressMode::indirectIndexed;
     }
   case 0x02:
-    if (hi == 0x0A) {
+    // if (hi == 0x0A || hi == 0x08 || hi == 0x0C || hi == 0x0E) {
+    if (!(hi & 0x01) && (hi & 0x08)) { // high nibble >= 8 and even
       return AddressMode::immediate;
     } else {
       // NOTE: rest are illegal
@@ -81,7 +82,11 @@ AddressMode Instruction::decodeAddressMode() {
     }
   case 0x03:
     // NOTE: all illegal
-    return AddressMode::implicit;
+    if (hi & 0x01) {
+      return AddressMode::indirectIndexed;
+    } else {
+      return AddressMode::indexedIndirect;
+    }
   case 0x04:
     if ((hi & 0x01) == 0) {
       return AddressMode::zeroPage;
@@ -104,8 +109,13 @@ AddressMode Instruction::decodeAddressMode() {
       return AddressMode::zeroPageX;
     }
   case 0x07:
-    // NOTE: all illegal
-    return AddressMode::implicit;
+    if (!(hi & 0x01)) {
+      return AddressMode::zeroPage;
+    } else if (hi == 0x09 || hi == 0x0B) {
+      return AddressMode::zeroPageY;
+    } else {
+      return AddressMode::zeroPageX;
+    }
   case 0x08:
     return AddressMode::implicit;
   case 0x09:
@@ -126,10 +136,10 @@ AddressMode Instruction::decodeAddressMode() {
     }
   case 0x0B:
     // NOTE: all either illegal or unofficial
-    if (hi == 0x0E) { // unofficial SBC immediate
+    if (!(hi & 0x01)) {
       return AddressMode::immediate;
     } else {
-      return AddressMode::implicit;
+      return AddressMode::absoluteY;
     }
 
   case 0x0C:
@@ -160,8 +170,13 @@ AddressMode Instruction::decodeAddressMode() {
       return AddressMode::absoluteX;
     }
   case 0x0F:
-    // NOTE: all illegal
-    return AddressMode::implicit;
+    if (!(hi & 0x01)) {
+      return AddressMode::absolute;
+    } else if (hi == 0x09 || hi == 0x0B) {
+      return AddressMode::absoluteY;
+    } else {
+      return AddressMode::absoluteX;
+    }
   default:
     return AddressMode::implicit;
   }
@@ -213,6 +228,11 @@ Operation Instruction::decodeOperation() {
   case 0x8C:
   case 0x94:
     return Operation::storeY;
+  case 0x87:
+  case 0x97:
+  case 0x83:
+  case 0x8F:
+    return Operation::storeAX;
   case 0x61:
   case 0x65:
   case 0x69:
@@ -438,7 +458,7 @@ ostream &operator<<(ostream &os, Instruction const &in) {
        << aModeMnemonics[static_cast<int>(in.addressMode)] << ")";
     break;
   }
-  ss << " C: " << std::dec << in.issueCycle + 7;
+  ss << " C: " << std::dec << in.issueCycle;
   os << ss.str();
   return os;
 }

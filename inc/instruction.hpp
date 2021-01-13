@@ -31,6 +31,7 @@ enum class Operation {
   storeA,
   storeX,
   storeY,
+  storeAX,
   add,
   subtract,
   increment,

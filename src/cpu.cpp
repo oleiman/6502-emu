@@ -51,6 +51,11 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
 // be nice, but this should be fine for now.
 // TODO(oren): Reset should restore CPU to reset state, currently does nothing
 void M6502::reset() { pending_reset_ = true; }
+void M6502::reset(AddressT init) {
+  reset();
+  rst_override_ = true;
+  init_pc_ = init;
+}
 void M6502::nmi() { pending_nmi_ = true; }
 
 std::function<void(void)> M6502::nmiPin() {
@@ -72,6 +77,10 @@ uint8_t M6502::step() {
   DataT opcode = readByte(state_.pc);
   instr::Instruction in(opcode, state_.pc, c);
   in.address = calculateAddress(in);
+
+  // if (in.operation == instr::Operation::loadAX ||
+  //     in.operation == instr::Operation::loadA)
+  //   std::cout << in << std::endl;
 
   // TODO(oren): Remove/Replace (very expensive and only needed for EhBASIC)
   // fireCallbacks(in);
@@ -168,6 +177,7 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::loadAX:
     op_LD(state_.rA, in.address);
     state_.rX = state_.rA;
+    break;
   case Operation::storeA:
     op_ST(in.address, state_.rA);
     break;
@@ -176,6 +186,9 @@ void M6502::dispatch(instr::Instruction const &in) {
     break;
   case Operation::storeY:
     op_ST(in.address, state_.rY);
+    break;
+  case Operation::storeAX:
+    op_ST(in.address, state_.rA & state_.rX);
     break;
   case Operation::add:
     op_ADC(in.address);
@@ -362,8 +375,14 @@ void M6502::op_Illegal(instr::Instruction const &in) {
 // but it shouldn't be timing critical so who care
 void M6502::op_Interrupt(AddressT vec) {
   // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
+
+  // TODO(oren): gross hack to ensure exact return address is pushed onto the
+  // stack
+  if (vec == BRK_VEC) {
+    ++state_.pc;
+  }
   if (vec != RST_VEC) {
-    AddressT returnAddr = state_.pc + 1;
+    AddressT returnAddr = state_.pc;
     DataT pc_hi = (returnAddr >> 8) & 0xFF;
     DataT pc_lo = returnAddr & 0xFF;
     op_PUSH(pc_hi); // tick 2
@@ -375,6 +394,10 @@ void M6502::op_Interrupt(AddressT vec) {
     op_PUSH(tmp); // tick 4
   } else {
     state_ = CpuState();
+    tick();
+    op_PUSH(0x00);
+    op_PUSH(0x00);
+    op_PUSH(0x00);
   }
 
   DataT target_lo = readByte(vec);                               // tick 5
@@ -382,6 +405,8 @@ void M6502::op_Interrupt(AddressT vec) {
   AddressT target = (target_hi << 8) | target_lo;
   if (vec != RST_VEC) {
     SET(state_.status, INT_DISABLE_M);
+  } else if (rst_override_) {
+    target = init_pc_;
   }
   op_JMP(target); // tick 7
 }
