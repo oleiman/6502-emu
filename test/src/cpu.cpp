@@ -64,7 +64,7 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
   infile.close();
   cpu.initPc(0x400u);
 
-  // dbg::Debugger d(true, false);
+  dbg::Debugger d(true, false);
 
   try {
     do {

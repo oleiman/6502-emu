@@ -27,6 +27,7 @@ enum class Operation {
   loadA,
   loadX,
   loadY,
+  loadAX,
   storeA,
   storeX,
   storeY,
@@ -112,9 +113,9 @@ private:
   DataT opcode_;
   DataT size_;
   unsigned long long start_cycle_;
+  AddressT pc_;
   AddressMode address_mode_;
   Operation operation_;
-  AddressT pc_;
   AddressT address_;
 
   void decodeAddressMode();

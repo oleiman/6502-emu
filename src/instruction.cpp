@@ -30,13 +30,13 @@ array<uint8_t, static_cast<int>(AddressMode::nAddressModes)> aModeSizes = {
 };
 
 array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
-    "ILLEGAL", "LDA", "LDX", "LDY", "STA", "STX", "STY", "ADC", "SBC",
-    "INC",     "INX", "INY", "DEC", "DEX", "DEY", "ASL", "ASL", "LSR",
-    "LSR",     "ROL", "ROL", "ROR", "ROR", "AND", "ORA", "EOR", "CMP",
-    "CPX",     "CPY", "BIT", "BPL", "BVC", "BCC", "BNE", "BMI", "BVS",
-    "BCS",     "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS", "TYA", "JMP",
-    "JSR",     "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK", "CLC",
-    "CLI",     "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
+    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "ADC",
+    "SBC",     "INC", "INX", "INY", "DEC", "DEX", "DEY", "ASL", "ASL",
+    "LSR",     "LSR", "ROL", "ROL", "ROR", "ROR", "AND", "ORA", "EOR",
+    "CMP",     "CPX", "CPY", "BIT", "BPL", "BVC", "BCC", "BNE", "BMI",
+    "BVS",     "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS", "TYA",
+    "JMP",     "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK",
+    "CLC",     "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
 array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
     "Imp",   "Accum", "Imm", "Abs",   "AbsX",     "AbsY",     "Zero",
@@ -44,9 +44,8 @@ array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
 };
 
 Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
-    : opcode_(opcode), size_(1), start_cycle_(cycle),
-      address_mode_(AddressMode::implicit), operation_(Operation::illegal),
-      pc_(pc) {
+    : opcode_(opcode), size_(1), start_cycle_(cycle), pc_(pc),
+      address_mode_(AddressMode::implicit), operation_(Operation::illegal) {
   decodeAddressMode();
   decodeOperation();
 }
@@ -211,6 +210,14 @@ void Instruction::decodeOperation() {
   case 0xB4:
   case 0xBC:
     operation_ = Operation::loadY;
+    break;
+  case 0xA7:
+  case 0xB7:
+  case 0xAF:
+  case 0xBF:
+  case 0xA3:
+  case 0xB3:
+    operation_ = Operation::loadAX;
     break;
   case 0x81:
   case 0x85:

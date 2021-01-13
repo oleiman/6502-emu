@@ -180,6 +180,9 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::loadY:
     op_LD(state_.rY, in.address());
     break;
+  case Operation::loadAX:
+    op_LD(state_.rA, in.address());
+    state_.rX = state_.rA;
   case Operation::storeA:
     op_ST(in.address(), state_.rA);
     break;
@@ -385,6 +388,8 @@ void M6502::op_Interrupt(AddressT vec) {
     SET(tmp, BIT5_M);
     SET(tmp, BIT4_M);
     op_PUSH(tmp); // tick 4
+  } else {
+    state_ = CpuState();
   }
 
   DataT target_lo = readByte(vec);                               // tick 5
@@ -398,7 +403,6 @@ void M6502::op_Interrupt(AddressT vec) {
 
 // load
 void M6502::op_LD(DataT &dest, AddressT source) {
-
   dest = readByte(source);
   setOrClearStatus(GET(dest, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(dest == 0, ZERO_M);
@@ -678,6 +682,9 @@ void M6502::op_PHA() {
 void M6502::op_PUSH(DataT source) {
   writeByte(STACK_POINTER(state_.sp), source);
   state_.sp--;
+  if (state_.sp == 0xFF) {
+    std::cerr << "WARNING: Stack overflow" << std::endl;
+  }
 }
 
 // pop from the stack into dest
@@ -694,8 +701,6 @@ void M6502::op_PLA() {
 void M6502::op_JSR(AddressT target) {
   // note that we push the pc of the last byte of the
   // jump instruction
-  // NOTE(oren): changed from state_.pc - 1, which wouldn't really make sense,
-  // yeah?
   AddressT returnAddr = state_.pc - 1;
   DataT ra_hi = (returnAddr >> 8) & 0xFF;
   DataT ra_lo = returnAddr & 0xFF;
