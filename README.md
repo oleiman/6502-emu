@@ -1,46 +1,40 @@
 # 6502-emu
 
-A simple (enough) 6502 emulator with an extremely dumb debugging interface.
+A cycle accurate 6502 emulator written in C++.
 
-## Build it
+The goal here is to provide a flexible enough library frontent that `6502-emu` could be reused in future emulations of complete 6502-based systems. I have an NES emulator in progress and hope to tackle C64 next.
+
+## Build it (with tests)
 
 ```[bash]
 $ cd /path/to/6502-emu
-$ ./build.sh
+$ ./build_dev.sh
 ```
 
 ## Run the tests (Allsuite)
+
+Passes a number of test suites pulled from various forums including 6502.org user Klaus2m5's functional test suite.
 
 ```[bash]
 $ cd build
 $ ./test/catch
 ```
 
-## Run EhBASIC
+## EhBASIC
 
-```[bash]
-$ cd build
-$ ./EhBASIC
-```
-
-Pretty janky as a programming environment: 
-- user I/O is not built out (just a thread with a getchar loop).
-- As a result, inputs shows up on the terminal right away but isn't processed until the next newline.
-- This results in double printing, when the EhBASIC prints the user input before evaluating its expressions.
-
-Even still, it's possible to execute simple BASIC commands (e.g. LET a = 23, PRINT a) in a terminal buffer. Pretty neat.
+NOTE: This is broken on account of some recent refactoring efforts in service of my NES project. Don't know when if ever I'll get around to fixing it up.
 
 ## Implementation notes
 
-This implementation is extremely a work in progress. There are some easy wins coming up as well as some not so easy wins.
+This implementation is complete enough to be useful, I think, and performs reasonably well, executing the "Klaus Functional" test suite in around 1.8s (~60MHz, give or take).
+
+In service of getting past nestest, I've implemented a handful of the less PITA unofficial opcodes. WIP on that front.
 
 TODO:
 
-- Very close to cycle accuracy. Certain instructions require some digging.
-- Cycle stepping is done via callback. While not very performant, this should provide enough flexibility to integrate this into a full-system emulation of, say, the NES. The machine itself is still funcamentally stepped by instruction.
-- Add interrupt test.
-- Start thinking about undocumented opcodes.
-- Address calculation should live closer to execution. Currently it happens before "dispatch", which doesn't make sense.
-- Address performance issues. Runs at a dozen or two MHz, but it's pretty bad, considering. Memory bus architecture is a likely culprit.
-- Remember: this is not a simulator ;)
+- Assemble and add interrupt test to catch suite.
+- Add remaining unofficial opcodes (full list forthcoming).
+- Memory mapping functionality (required for full-system emulation) is injected into the CPU at runtime and consumed via virtual function interface. I don't like the design of the mapper class very much.
+- The instruction address mode decoding logic would probably be better implemented as straight lookup tables, both for performance reasons and for easier verification.
+- Mantra: this is not a simulator ;)
 

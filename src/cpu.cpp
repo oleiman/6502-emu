@@ -585,12 +585,6 @@ void M6502::op_EOR(AddressT source) {
 // compare memory and register
 void M6502::op_CMP(DataT reg, AddressT source) {
   DataT val = readByte(source);
-  // uint16_t result = static_cast<uint16_t>(reg);
-  // result += static_cast<uint16_t>(~val);
-  // setOrClearStatus(result & 0xFF00, CARRY_M);
-  // result &= 0xFF;
-  // setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
-  // setOrClearStatus(result == 0, ZERO_M);
 
   if (reg != val) {
     uint8_t tmp = reg - val;
@@ -783,11 +777,8 @@ M6502::DataT M6502::doBinaryAdc(DataT reg, DataT addend) {
 
   if (GET(reg, NEGATIVE_M) == GET(addend, NEGATIVE_M) &&
       GET(reg, NEGATIVE_M) != GET(result, NEGATIVE_M)) {
-    // std::cerr << "setting overflow: " << +reg << "+" << +addend << "="
-    //           << +result << std::endl;
     SET(state_.status, OVERFLOW_M);
   } else {
-    // std::cerr << "clear overflow" << std::endl;
     CLEAR(state_.status, OVERFLOW_M);
   }
   return static_cast<DataT>(result);

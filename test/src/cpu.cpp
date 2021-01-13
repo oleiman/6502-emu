@@ -43,10 +43,6 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
             << std::endl;
 }
 
-// NOTE(oren): wall clock before memory refactor: 16.601s
-// ~5.8 MHz
-// After removing junk code: 10.722
-// ~8.97 MHz (and that's with virtual function calls)
 TEST_CASE("KlausFunctional", "[integration][cpu]") {
   ArrayMapper mp;
   int instructions = 0;
