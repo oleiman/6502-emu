@@ -50,16 +50,15 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
 // into the ppu as callbacks. something a bit more general would
 // be nice, but this should be fine for now.
 // TODO(oren): Reset should restore CPU to reset state, currently does nothing
-void M6502::reset() { pending_reset_ = true; }
+void M6502::reset() {
+  pending_reset_ = true;
+  rst_override_ = false;
+}
 void M6502::reset(AddressT init) {
-  reset();
+  pending_reset_ = true;
+  // TODO(oren): pair...
   rst_override_ = true;
   init_pc_ = init;
-}
-void M6502::nmi() { pending_nmi_ = true; }
-
-std::function<void(void)> M6502::nmiPin() {
-  return std::bind(&M6502::nmi, this);
 }
 
 uint8_t M6502::step() {

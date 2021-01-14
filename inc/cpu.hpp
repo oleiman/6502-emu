@@ -44,11 +44,8 @@ public:
   uint8_t step();
   void reset();
   void reset(AddressT init);
-  void nmi();
-  bool nmiPending() { return pending_nmi_; }
+  bool &nmiPin() { return pending_nmi_; }
   CpuState const &state() { return state_; }
-
-  std::function<void(void)> nmiPin();
 
   template <class Debugger> uint8_t debugStep(Debugger &debugger) {
     step_cycles_ = 0;
