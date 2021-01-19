@@ -44,10 +44,9 @@ array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
 };
 
 Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
-    : opcode(opcode), issueCycle(cycle), pc(pc),
-      addressMode(decodeAddressMode()),
-      size(aModeSizes[static_cast<int>(addressMode)]),
-      operation(decodeOperation()) {}
+    : opcode(opcode), operation(decodeOperation()), pc(pc),
+      addressMode(decodeAddressMode()), issueCycle(cycle),
+      size(aModeSizes[static_cast<int>(addressMode)]) {}
 
 // TODO(oren): This is a very expensive lookup table. Refactor.
 AddressMode Instruction::decodeAddressMode() {

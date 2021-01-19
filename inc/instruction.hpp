@@ -99,12 +99,12 @@ struct Instruction {
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
   const DataT opcode;
-  const unsigned long long issueCycle;
+  const Operation operation;
   const AddressT pc;
   const AddressMode addressMode;
-  const DataT size;
-  const Operation operation;
   AddressT address = 0x0000;
+  const unsigned long long issueCycle;
+  const DataT size;
 
 private:
   AddressMode decodeAddressMode();
