@@ -73,17 +73,11 @@ uint8_t M6502::step() {
 
   auto c = state_.cycle;
 
-  DataT opcode = readByte(state_.pc);
-  instr::Instruction in(opcode, state_.pc, c);
-  in.address = calculateAddress(in);
-
-  // if (in.operation == instr::Operation::loadAX ||
-  //     in.operation == instr::Operation::loadA)
-  //   std::cout << in << std::endl;
-
-  // TODO(oren): Remove/Replace (very expensive and only needed for EhBASIC)
-  // fireCallbacks(in);
-  dispatch(in);
+  dispatch([&]() {
+    instr::Instruction in(readByte(state_.pc), state_.pc, c);
+    in.address = calculateAddress(in);
+    return in;
+  }());
 
   return step_cycles_;
 }

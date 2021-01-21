@@ -59,15 +59,15 @@ public:
       pending_reset_ = false;
     }
     auto c = state_.cycle;
-    DataT opcode = readByte(state_.pc);
-    instr::Instruction in(opcode, state_.pc, c);
 
-    // Yuck.
-    in.address = calculateAddress(in);
+    auto const in = [&]() {
+      instr::Instruction in(readByte(state_.pc), state_.pc, c);
+      in.address = calculateAddress(in);
+      return in;
+    }();
 
     debugger.step(in, state_, mapper_);
 
-    fireCallbacks(in);
     dispatch(in);
 
     return step_cycles_;
