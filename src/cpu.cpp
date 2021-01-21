@@ -71,14 +71,14 @@ uint8_t M6502::step() {
     pending_reset_ = false;
   }
 
-  auto c = state_.cycle;
-
   dispatch([&]() {
-    instr::Instruction in(readByte(state_.pc), state_.pc, c);
+    instr::Instruction in(readByte(state_.pc), state_.pc,
+                          state_.cycle + step_cycles_);
     in.address = calculateAddress(in);
     return in;
   }());
 
+  state_.cycle += step_cycles_;
   return step_cycles_;
 }
 

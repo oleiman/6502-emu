@@ -58,18 +58,17 @@ public:
       op_Interrupt(RST_VEC);
       pending_reset_ = false;
     }
-    auto c = state_.cycle;
 
-    auto const in = [&]() {
-      instr::Instruction in(readByte(state_.pc), state_.pc, c);
-      in.address = calculateAddress(in);
-      return in;
-    }();
+    dispatch(debugger.step(
+        [&]() {
+          instr::Instruction in(readByte(state_.pc), state_.pc,
+                                state_.cycle + step_cycles_);
+          in.address = calculateAddress(in);
+          return in;
+        }(),
+        state_, mapper_));
 
-    debugger.step(in, state_, mapper_);
-
-    dispatch(in);
-
+    state_.cycle += step_cycles_;
     return step_cycles_;
   }
 
@@ -77,7 +76,7 @@ public:
 
 private:
   void tick() {
-    ++state_.cycle;
+    // ++state_.cycle;
     ++step_cycles_;
   }
   const static AddressT NMI_VEC = 0xFFFA;

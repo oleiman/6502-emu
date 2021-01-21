@@ -21,8 +21,9 @@ public:
   explicit Debugger(bool should_break, bool trace);
   ~Debugger() = default;
 
-  void step(instr::Instruction const &in, cpu::CpuState const &state,
-            mem::Mapper &mapper);
+  instr::Instruction const &step(instr::Instruction const &in,
+                                 cpu::CpuState const &state,
+                                 mem::Mapper &mapper);
 
 private:
   bool break_;

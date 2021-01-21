@@ -24,8 +24,8 @@ namespace dbg {
 Debugger::Debugger(bool should_break, bool trace)
     : break_(should_break), trace_(trace), step_(false), iter_(0) {}
 
-void Debugger::step(Instruction const &in, CpuState const &state,
-                    mem::Mapper &mapper) {
+Instruction const &Debugger::step(Instruction const &in, CpuState const &state,
+                                  mem::Mapper &mapper) {
 
   if (step_) {
     cout << in << endl;
@@ -81,6 +81,8 @@ void Debugger::step(Instruction const &in, CpuState const &state,
   }
 
   prev_in_ = make_unique<Instruction>(in);
+
+  return in;
 }
 
 Debugger::AddressT Debugger::extract_addr(string const &command) {
