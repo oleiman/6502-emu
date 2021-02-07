@@ -198,6 +198,9 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::incrementY:
     op_INR(state_.rY, 1);
     break;
+  case Operation::incrementSbc:
+    op_SBCV(op_INC(in.address, 1));
+    break;
   case Operation::decrement:
     op_INC(in.address, -1);
     break;
@@ -207,11 +210,17 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::decrementY:
     op_INR(state_.rY, -1);
     break;
+  case Operation::decrementCmp:
+    op_CMPV(state_.rA, op_INC(in.address, -1));
+    break;
   case Operation::shiftL:
     op_ASL(in.address);
     break;
   case Operation::shiftLA:
     op_ASLV(state_.rA);
+    break;
+  case Operation::shiftLOrA:
+    op_ORAV(op_ASL(in.address));
     break;
   case Operation::shiftR:
     op_LSR(in.address);
@@ -219,17 +228,26 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::shiftRA:
     op_LSRV(state_.rA);
     break;
+  case Operation::shiftRXor:
+    op_EORV(op_LSR(in.address));
+    break;
   case Operation::rotateL:
     op_ROL(in.address);
     break;
   case Operation::rotateLA:
     op_ROLV(state_.rA);
     break;
+  case Operation::rotateLAnd:
+    op_ANDV(op_ROL(in.address));
+    break;
   case Operation::rotateR:
     op_ROR(in.address);
     break;
   case Operation::rotateRA:
     op_RORV(state_.rA);
+    break;
+  case Operation::rotateRAdc:
+    op_ADCV(op_ROR(in.address));
     break;
   case Operation::bwAND:
     op_AND(in.address);
@@ -422,6 +440,10 @@ void M6502::op_ST(AddressT dest, DataT data) {
 // add memory to accumulator with carry
 void M6502::op_ADC(AddressT source) {
   DataT addend = readByte(source);
+  op_ADCV(addend);
+}
+
+void M6502::op_ADCV(DataT addend) {
   // TODO(oren): not used? logic error?
   // DataT input_carry = GET(_state.status, CARRY_M);
   uint16_t result = 0;
@@ -454,6 +476,10 @@ void M6502::op_ADC(AddressT source) {
 void M6502::op_SBC(AddressT source) {
   // take two's complement with borrow
   DataT subtrahend = readByte(source);
+  op_SBCV(subtrahend);
+}
+
+void M6502::op_SBCV(DataT subtrahend) {
   // TODO(oren): not used? logic error?
   // DataT input_carry = GET(_state.status, CARRY_M);
   uint16_t result = 0;
@@ -488,13 +514,14 @@ void M6502::op_SBC(AddressT source) {
 }
 
 // increment memory
-void M6502::op_INC(AddressT source, int8_t val) {
+M6502::DataT M6502::op_INC(AddressT source, int8_t val) {
   DataT result = readByte(source);
   writeByte(source, result); // phantom write
   result += val;
   setOrClearStatus(GET(result, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(result == 0, ZERO_M);
   writeByte(source, result);
+  return result;
 }
 
 // increment register
@@ -506,11 +533,12 @@ void M6502::op_INR(DataT &reg, int8_t val) {
 }
 
 // arithmetic shift left (read/modify/write)
-void M6502::op_ASL(AddressT source) {
+M6502::DataT M6502::op_ASL(AddressT source) {
   DataT result = readByte(source);
   // writeByte(source, result);
   op_ASLV(result);
   writeByte(source, result);
+  return result;
 }
 
 void M6502::op_ASLV(DataT &val) {
@@ -522,12 +550,13 @@ void M6502::op_ASLV(DataT &val) {
 }
 
 // logical shift right on memory
-void M6502::op_LSR(AddressT source) {
+M6502::DataT M6502::op_LSR(AddressT source) {
   DataT result = readByte(source);
   // dummy write
   // writeByte(source, result);
   op_LSRV(result);
   writeByte(source, result);
+  return result;
 }
 
 // logical shift right on value
@@ -540,10 +569,11 @@ void M6502::op_LSRV(DataT &val) {
 }
 
 // rotate left on memory
-void M6502::op_ROL(AddressT source) {
+M6502::DataT M6502::op_ROL(AddressT source) {
   DataT result = readByte(source);
   op_ROLV(result);
   writeByte(source, result);
+  return result;
 }
 
 // rotate left on value
@@ -560,10 +590,11 @@ void M6502::op_ROLV(DataT &val) {
 }
 
 // rotate right on memory
-void M6502::op_ROR(AddressT source) {
+M6502::DataT M6502::op_ROR(AddressT source) {
   DataT result = readByte(source);
   op_RORV(result);
   writeByte(source, result);
+  return result;
 }
 
 void M6502::op_RORV(DataT &val) {
@@ -580,22 +611,25 @@ void M6502::op_RORV(DataT &val) {
 }
 
 // AND memory with accumulator
-void M6502::op_AND(AddressT source) {
-  state_.rA &= readByte(source);
+void M6502::op_AND(AddressT source) { op_ANDV(readByte(source)); }
+void M6502::op_ANDV(DataT val) {
+  state_.rA &= val;
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
 }
 
 // OR memory with accumulator
-void M6502::op_ORA(AddressT source) {
-  state_.rA |= readByte(source);
+void M6502::op_ORA(AddressT source) { op_ORAV(readByte(source)); }
+void M6502::op_ORAV(DataT val) {
+  state_.rA |= val;
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
 }
 
 // XOR memory with accumulator
-void M6502::op_EOR(AddressT source) {
-  state_.rA ^= readByte(source);
+void M6502::op_EOR(AddressT source) { op_EORV(readByte(source)); }
+void M6502::op_EORV(DataT val) {
+  state_.rA ^= val;
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
 }
@@ -603,7 +637,10 @@ void M6502::op_EOR(AddressT source) {
 // compare memory and register
 void M6502::op_CMP(DataT reg, AddressT source) {
   DataT val = readByte(source);
+  op_CMPV(reg, val);
+}
 
+void M6502::op_CMPV(DataT reg, DataT val) {
   if (reg != val) {
     uint8_t tmp = reg - val;
     setOrClearStatus(GET(tmp, NEGATIVE_M), NEGATIVE_M);

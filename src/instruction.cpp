@@ -30,12 +30,12 @@ array<uint8_t, static_cast<int>(AddressMode::nAddressModes)> aModeSizes = {
 };
 
 array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
-    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "SAX",
-    "ADC",     "SBC", "INC", "INX", "INY", "DEC", "DEX", "DEY", "ASL",
-    "ASL",     "LSR", "LSR", "ROL", "ROL", "ROR", "ROR", "AND", "ORA",
-    "EOR",     "CMP", "CPX", "CPY", "BIT", "BPL", "BVC", "BCC", "BNE",
-    "BMI",     "BVS", "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS",
-    "TYA",     "JMP", "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP",
+    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "SAX", "ADC",
+    "SBC",     "INC", "INX", "INY", "ISC", "DEC", "DEX", "DEY", "DCP", "ASL",
+    "ASL",     "SLO", "LSR", "LSR", "SRE", "ROL", "ROL", "RLA", "ROR", "ROR",
+    "RRA",     "AND", "ORA", "EOR", "CMP", "CPX", "CPY", "BIT", "BPL", "BVC",
+    "BCC",     "BNE", "BMI", "BVS", "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA",
+    "TXS",     "TYA", "JMP", "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP",
     "BRK",     "CLC", "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
 array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
@@ -260,6 +260,14 @@ Operation Instruction::decodeOperation() {
     return Operation::incrementX;
   case 0xC8:
     return Operation::incrementY;
+  case 0xE3:
+  case 0xE7:
+  case 0xEF:
+  case 0xF3:
+  case 0xF7:
+  case 0xFB:
+  case 0xFF:
+    return Operation::incrementSbc;
   case 0xC6:
   case 0xCE:
   case 0xD6:
@@ -269,6 +277,14 @@ Operation Instruction::decodeOperation() {
     return Operation::decrementX;
   case 0x88:
     return Operation::decrementY;
+  case 0xC3:
+  case 0xC7:
+  case 0xCF:
+  case 0xD3:
+  case 0xD7:
+  case 0xDB:
+  case 0xDF:
+    return Operation::decrementCmp;
   case 0x06:
   case 0x0E:
   case 0x16:
@@ -276,6 +292,14 @@ Operation Instruction::decodeOperation() {
     return Operation::shiftL;
   case 0x0A:
     return Operation::shiftLA;
+  case 0x03:
+  case 0x07:
+  case 0x0F:
+  case 0x13:
+  case 0x17:
+  case 0x1B:
+  case 0x1F:
+    return Operation::shiftLOrA;
   case 0x46:
   case 0x4E:
   case 0x56:
@@ -283,6 +307,14 @@ Operation Instruction::decodeOperation() {
     return Operation::shiftR;
   case 0x4A:
     return Operation::shiftRA;
+  case 0x43:
+  case 0x47:
+  case 0x4F:
+  case 0x53:
+  case 0x57:
+  case 0x5B:
+  case 0x5F:
+    return Operation::shiftRXor;
   case 0x26:
   case 0x2E:
   case 0x36:
@@ -290,6 +322,14 @@ Operation Instruction::decodeOperation() {
     return Operation::rotateL;
   case 0x2A:
     return Operation::rotateLA;
+  case 0x23:
+  case 0x27:
+  case 0x2F:
+  case 0x33:
+  case 0x37:
+  case 0x3B:
+  case 0x3F:
+    return Operation::rotateLAnd;
   case 0x66:
   case 0x6E:
   case 0x76:
@@ -297,6 +337,14 @@ Operation Instruction::decodeOperation() {
     return Operation::rotateR;
   case 0x6A:
     return Operation::rotateRA;
+  case 0x63:
+  case 0x67:
+  case 0x6F:
+  case 0x73:
+  case 0x77:
+  case 0x7B:
+  case 0x7F:
+    return Operation::rotateRAdc;
   case 0x21:
   case 0x25:
   case 0x29:
@@ -406,6 +454,7 @@ Operation Instruction::decodeOperation() {
   case 0xF8:
     return Operation::setD;
   case 0x80:
+  case 0x89:
   case 0x0C:
   case 0x1C:
   case 0x3C:
