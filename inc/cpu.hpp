@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stack>
 #include <string>
 
 namespace cpu {
@@ -45,6 +46,7 @@ public:
   void reset();
   void reset(AddressT init);
   bool &nmiPin() { return pending_nmi_; }
+  bool &irqPin() { return pending_irq_; }
   CpuState const &state() { return state_; }
 
   template <class Debugger> uint8_t debugStep(Debugger &debugger) {
@@ -57,6 +59,9 @@ public:
     } else if (pending_reset_) {
       op_Interrupt(RST_VEC);
       pending_reset_ = false;
+    } else if (pending_irq_) {
+      op_Interrupt(IRQ_VEC);
+      pending_irq_ = false;
     }
 
     dispatch(debugger.step(
@@ -79,9 +84,13 @@ private:
     // ++state_.cycle;
     ++step_cycles_;
   }
+
+  void disableInterrupts();
+  void restoreInterrupts();
+
   const static AddressT NMI_VEC = 0xFFFA;
   const static AddressT RST_VEC = 0xFFFC;
-  const static AddressT BRK_VEC = 0xFFFE;
+  const static AddressT IRQ_VEC = 0xFFFE;
 
   CpuState state_;
   uint8_t step_cycles_;
@@ -90,6 +99,8 @@ private:
 
   bool pending_reset_ = false;
   bool pending_nmi_ = false;
+  bool pending_irq_ = false;
+  std::stack<bool> iflag_prev_;
   bool enable_bcd_;
   bool rst_override_ = false;
   AddressT init_pc_ = 0;

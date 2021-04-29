@@ -46,10 +46,8 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
   return true;
 }
 
-// NOTE: these are effectively interrupt pins, we'll pass them
-// into the ppu as callbacks. something a bit more general would
-// be nice, but this should be fine for now.
 // TODO(oren): Reset should restore CPU to reset state, currently does nothing
+// but set reset line
 void M6502::reset() {
   pending_reset_ = true;
   rst_override_ = false;
@@ -69,6 +67,9 @@ uint8_t M6502::step() {
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC);
     pending_reset_ = false;
+  } else if (pending_irq_) {
+    op_Interrupt(IRQ_VEC);
+    pending_irq_ = false;
   }
 
   dispatch([&]() {
@@ -103,6 +104,24 @@ M6502::DataT M6502::readByte(AddressT addr) {
 void M6502::writeByte(AddressT addr, DataT data) {
   mapper_.write(addr, data);
   tick();
+}
+
+void M6502::disableInterrupts() {
+  iflag_prev_.push(GET(state_.status, INT_DISABLE_M));
+  SET(state_.status, INT_DISABLE_M);
+}
+
+// NOTE(oren): expectation for this is not well understood
+void M6502::restoreInterrupts() {
+  if (iflag_prev_.empty() || !iflag_prev_.top()) {
+    CLEAR(state_.status, INT_DISABLE_M);
+  } else {
+    SET(state_.status, INT_DISABLE_M);
+  }
+  // NOTE(oren): sketchy...do i need a stack here or something?
+  if (!iflag_prev_.empty()) {
+    iflag_prev_.pop();
+  }
 }
 
 M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
@@ -387,9 +406,14 @@ void M6502::op_Illegal(instr::Instruction const &in) {
 void M6502::op_Interrupt(AddressT vec) {
   // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
 
+  // INT_DISABLE cuases all non-NMI interrupts to be ignored
+  if (vec != NMI_VEC && GET(state_.status, INT_DISABLE_M)) {
+    return;
+  }
+
   // TODO(oren): gross hack to ensure exact return address is pushed onto the
   // stack
-  if (vec == BRK_VEC) {
+  if (vec == IRQ_VEC) {
     ++state_.pc;
   }
   if (vec != RST_VEC) {
@@ -415,7 +439,8 @@ void M6502::op_Interrupt(AddressT vec) {
   AddressT target_hi = static_cast<AddressT>(readByte(vec + 1)); // tick 6
   AddressT target = (target_hi << 8) | target_lo;
   if (vec != RST_VEC) {
-    SET(state_.status, INT_DISABLE_M);
+    // TODO(oren): disable on NMI or just IRQ?
+    disableInterrupts();
   } else if (rst_override_) {
     target = init_pc_;
   }
@@ -771,6 +796,9 @@ void M6502::op_RTI() {
   DataT target_lo = readByte(STACK_POINTER(state_.sp++)); // tick 4
   AddressT target_hi =
       static_cast<AddressT>(readByte(STACK_POINTER(state_.sp))); // tick 5
+  // clear interrupt disable flag
+  // NOTE(oren): spec says "restore to previous state"
+  restoreInterrupts();
   // no pc increment here, address on stack is precise return address
   op_JMP((target_hi << 8) | target_lo); // tick 6
 }
@@ -795,7 +823,7 @@ void M6502::op_PLP() {
 }
 
 // force interrupt
-void M6502::op_BRK() { op_Interrupt(BRK_VEC); }
+void M6502::op_BRK() { op_Interrupt(IRQ_VEC); }
 
 void M6502::op_ClearFlag(uint8_t select) {
   CLEAR(state_.status, select);
