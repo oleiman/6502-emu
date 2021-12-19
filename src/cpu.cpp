@@ -62,13 +62,13 @@ void M6502::reset(AddressT init) {
 uint8_t M6502::step() {
   step_cycles_ = 0;
   if (pending_nmi_) {
-    op_Interrupt(NMI_VEC);
+    op_Interrupt(NMI_VEC, IntSource::INTLINE);
     pending_nmi_ = false;
   } else if (pending_reset_) {
-    op_Interrupt(RST_VEC);
+    op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
   } else if (pending_irq_) {
-    op_Interrupt(IRQ_VEC);
+    op_Interrupt(IRQ_VEC, IntSource::INTLINE);
     pending_irq_ = false;
   }
 
@@ -403,7 +403,7 @@ void M6502::op_Illegal(instr::Instruction const &in) {
 // TODO(oren): a bit gross, but adding NMI and RESET fairly easily
 // technically reset would consume the 7 cycles with dummy stack reads
 // but it shouldn't be timing critical so who care
-void M6502::op_Interrupt(AddressT vec) {
+void M6502::op_Interrupt(AddressT vec, IntSource src) {
   // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
 
   // INT_DISABLE cuases all non-NMI interrupts to be ignored
@@ -425,7 +425,11 @@ void M6502::op_Interrupt(AddressT vec) {
 
     DataT tmp = state_.status;
     SET(tmp, BIT5_M);
-    SET(tmp, BIT4_M);
+    if (src == IntSource::INSTRUCTION) {
+      SET(tmp, BIT4_M);
+    } else {
+      CLEAR(tmp, BIT4_M);
+    }
     op_PUSH(tmp); // tick 4
   } else {
     state_ = CpuState();
@@ -823,7 +827,7 @@ void M6502::op_PLP() {
 }
 
 // force interrupt
-void M6502::op_BRK() { op_Interrupt(IRQ_VEC); }
+void M6502::op_BRK() { op_Interrupt(IRQ_VEC, IntSource::INSTRUCTION); }
 
 void M6502::op_ClearFlag(uint8_t select) {
   CLEAR(state_.status, select);

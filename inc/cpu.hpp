@@ -54,13 +54,13 @@ public:
     if (pending_nmi_) {
       std::cout << "Jump to NMI_VEC from: " << std::hex << state_.pc
                 << std::endl;
-      op_Interrupt(NMI_VEC);
+      op_Interrupt(NMI_VEC, IntSource::INTLINE);
       pending_nmi_ = false;
     } else if (pending_reset_) {
-      op_Interrupt(RST_VEC);
+      op_Interrupt(RST_VEC, IntSource::INTLINE);
       pending_reset_ = false;
     } else if (pending_irq_) {
-      op_Interrupt(IRQ_VEC);
+      op_Interrupt(IRQ_VEC, IntSource::INTLINE);
       pending_irq_ = false;
     }
 
@@ -80,6 +80,10 @@ public:
   void registerCallback(instr::Operation op, Callback c);
 
 private:
+  enum class IntSource {
+    INSTRUCTION = 0x00,
+    INTLINE = 0x01,
+  };
   void tick() {
     // ++state_.cycle;
     ++step_cycles_;
@@ -126,7 +130,7 @@ private:
   // Good software engineering, not so good for the prospect
   // of migrating to a cycle-ticked architecture.
   void op_Illegal(instr::Instruction const &in);
-  void op_Interrupt(AddressT vec);
+  void op_Interrupt(AddressT vec, IntSource src);
   void op_LD(DataT &dest, AddressT source);
   void op_ST(AddressT dest, DataT data);
   void op_ADC(AddressT source);
