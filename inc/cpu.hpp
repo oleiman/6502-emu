@@ -5,11 +5,14 @@
 
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <stack>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace cpu {
 
