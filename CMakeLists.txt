@@ -25,8 +25,12 @@ if (WITH_BASIC)
   target_link_libraries(EhBASIC 6502-emu pthread)
 endif()
 
+if (LINUX AND NOT APPLE)
+set(GPERF_LIB profiler)
+endif()
+
 
 if (WITH_TESTS)
-  target_link_libraries(6502-emu profiler)
+  target_link_libraries(6502-emu ${GPERF_LIB})
   add_subdirectory(test)
 endif()
