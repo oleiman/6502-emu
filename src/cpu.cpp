@@ -407,7 +407,10 @@ void M6502::op_Interrupt(AddressT vec, IntSource src) {
   // NOTE(oren): Coding to Klaus test...am i reading the spec correctly?
 
   // INT_DISABLE cuases all non-NMI interrupts to be ignored
-  if (vec != NMI_VEC && GET(state_.status, INT_DISABLE_M)) {
+  // IntSource::INSTRUCTION indicates a BRK triggered interrupt,
+  // which is non-maskable but targets the IRQ vector
+  if (vec != NMI_VEC && src != IntSource::INSTRUCTION &&
+      GET(state_.status, INT_DISABLE_M)) {
     return;
   }
 
