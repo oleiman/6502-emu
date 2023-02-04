@@ -416,7 +416,7 @@ void M6502::op_Interrupt(AddressT vec, IntSource src) {
 
   // TODO(oren): gross hack to ensure exact return address is pushed onto the
   // stack
-  if (vec == IRQ_VEC) {
+  if (vec == IRQ_VEC && src == IntSource::INSTRUCTION) {
     ++state_.pc;
   }
   if (vec != RST_VEC) {
@@ -748,9 +748,9 @@ void M6502::op_PHA() {
 void M6502::op_PUSH(DataT source) {
   writeByte(STACK_POINTER(state_.sp), source);
   state_.sp--;
-  if (state_.sp == 0xFF) {
-    std::cerr << "WARNING: Stack overflow" << std::endl;
-  }
+  // if (state_.sp == 0xFF) {
+  //   std::cerr << "WARNING: Stack overflow" << std::endl;
+  // }
 }
 
 // pop from the stack into dest
