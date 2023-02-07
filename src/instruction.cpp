@@ -478,6 +478,7 @@ Operation Instruction::decodeOperation() {
   case 0xDA:
   case 0xEA:
   case 0xFA:
+  case 0x82:
     return Operation::nop;
   default:
     return Operation::illegal;

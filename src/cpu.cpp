@@ -69,7 +69,7 @@ uint8_t M6502::step() {
     pending_reset_ = false;
   } else if (pending_irq_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-    pending_irq_ = false;
+    // pending_irq_ = false;
   }
 
   dispatch([&]() {
