@@ -12,12 +12,13 @@ class Mapper {
 public:
   virtual void write(uint16_t addr, uint8_t data) = 0;
   virtual uint8_t read(uint16_t addr) = 0;
+  virtual void tick(uint16_t) = 0;
 };
 
 class ArrayMapper : public Mapper {
 public:
   constexpr static size_t size = 1ul << (sizeof(uint16_t) * 8);
-  void write(uint16_t addr, uint8_t data) {
+  void write(uint16_t addr, uint8_t data) override {
     if (addr < mem_.size()) {
       mem_[addr] = data;
     } else {
@@ -28,7 +29,7 @@ public:
     }
   }
 
-  uint8_t read(uint16_t addr) {
+  uint8_t read(uint16_t addr) override {
     if (addr < mem_.size()) {
       return mem_[addr];
     } else {
@@ -38,6 +39,8 @@ public:
       throw std::runtime_error(ss.str());
     }
   }
+
+  void tick(uint16_t) override {}
 
 private:
   std::array<uint8_t, size> mem_;

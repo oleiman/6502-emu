@@ -88,8 +88,8 @@ private:
     INTLINE = 0x01,
   };
   void tick() {
-    // ++state_.cycle;
     ++step_cycles_;
+    mapper_.tick(1);
   }
 
   void disableInterrupts();
