@@ -38,6 +38,7 @@ public:
   // TODO(oren): Callback hack is used only for EhBASIC, and I think
   // we can cover this use case with the memory mapper abstraction.
   using Callback = std::function<void(AddressT)>;
+  using TickHandler = std::function<void(void)>;
 
   explicit M6502(mem::Mapper &mapper, bool enable_bcd = true)
       : mapper_(mapper), enable_bcd_(enable_bcd) {}
@@ -82,6 +83,8 @@ public:
 
   void registerCallback(instr::Operation op, Callback c);
 
+  void registerTickHandler(TickHandler f) { _tick_handlers.push_back(f); }
+
 private:
   enum class IntSource {
     INSTRUCTION = 0x00,
@@ -89,8 +92,12 @@ private:
   };
   void tick() {
     ++step_cycles_;
-    mapper_.tick(1);
+    for (auto &h : _tick_handlers) {
+      h();
+    }
   }
+
+  std::vector<TickHandler> _tick_handlers;
 
   void disableInterrupts();
   void restoreInterrupts();
