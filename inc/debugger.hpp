@@ -19,11 +19,11 @@ public:
   using AddressT = cpu::M6502::AddressT;
   using DataT = cpu::M6502::DataT;
   explicit Debugger(bool should_break, bool trace);
-  ~Debugger() = default;
+  virtual ~Debugger() = default;
 
-  instr::Instruction const &step(instr::Instruction const &in,
-                                 cpu::CpuState const &state,
-                                 mem::Mapper &mapper);
+  virtual instr::Instruction const &step(instr::Instruction const &in,
+                                         cpu::CpuState const &state,
+                                         mem::Mapper &mapper);
 
 private:
   bool break_;

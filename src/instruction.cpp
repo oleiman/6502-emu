@@ -48,6 +48,11 @@ Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
       addressMode(decodeAddressMode()), issueCycle(cycle),
       size(aModeSizes[static_cast<int>(addressMode)]) {}
 
+Instruction::Instruction(const Instruction &other)
+    : opcode(other.opcode), operation(other.operation), pc(other.pc),
+      addressMode(other.addressMode), issueCycle(other.issueCycle),
+      size(other.size) {}
+
 // TODO(oren): This is a very expensive lookup table. Refactor.
 AddressMode Instruction::decodeAddressMode() {
   DataT lo = opcode & 0x0F;

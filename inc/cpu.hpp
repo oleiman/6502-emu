@@ -14,6 +14,10 @@
 #include <unordered_map>
 #include <vector>
 
+namespace dbg {
+class Debugger;
+}
+
 namespace cpu {
 
 struct CpuState {
@@ -53,33 +57,7 @@ public:
   bool &irqPin() { return pending_irq_; }
   CpuState const &state() { return state_; }
 
-  template <class Debugger> uint8_t debugStep(Debugger &debugger) {
-    step_cycles_ = 0;
-    if (pending_nmi_) {
-      std::cout << "Jump to NMI_VEC from: " << std::hex << state_.pc
-                << std::endl;
-      op_Interrupt(NMI_VEC, IntSource::INTLINE);
-      pending_nmi_ = false;
-    } else if (pending_reset_) {
-      op_Interrupt(RST_VEC, IntSource::INTLINE);
-      pending_reset_ = false;
-    } else if (pending_irq_) {
-      op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-      pending_irq_ = false;
-    }
-
-    dispatch(debugger.step(
-        [&]() {
-          instr::Instruction in(readByte(state_.pc), state_.pc,
-                                state_.cycle + step_cycles_);
-          in.address = calculateAddress(in);
-          return in;
-        }(),
-        state_, mapper_));
-
-    state_.cycle += step_cycles_;
-    return step_cycles_;
-  }
+  uint8_t debugStep(dbg::Debugger &debugger);
 
   void registerCallback(instr::Operation op, Callback c);
 

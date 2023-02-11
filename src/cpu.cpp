@@ -1,4 +1,5 @@
 #include "cpu.hpp"
+#include "debugger.hpp"
 
 #include <bitset>
 #include <iostream>
@@ -78,6 +79,32 @@ uint8_t M6502::step() {
     in.address = calculateAddress(in);
     return in;
   }());
+
+  state_.cycle += step_cycles_;
+  return step_cycles_;
+}
+
+uint8_t M6502::debugStep(dbg::Debugger &debugger) {
+  step_cycles_ = 0;
+  if (pending_nmi_) {
+    op_Interrupt(NMI_VEC, IntSource::INTLINE);
+    pending_nmi_ = false;
+  } else if (pending_reset_) {
+    op_Interrupt(RST_VEC, IntSource::INTLINE);
+    pending_reset_ = false;
+  } else if (pending_irq_) {
+    op_Interrupt(IRQ_VEC, IntSource::INTLINE);
+    // pending_irq_ = false;
+  }
+
+  dispatch(debugger.step(
+      [&]() {
+        instr::Instruction in(readByte(state_.pc), state_.pc,
+                              state_.cycle + step_cycles_);
+        in.address = calculateAddress(in);
+        return in;
+      }(),
+      state_, mapper_));
 
   state_.cycle += step_cycles_;
   return step_cycles_;

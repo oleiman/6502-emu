@@ -102,6 +102,9 @@ struct Instruction {
   explicit Instruction(DataT opcode, AddressT pc, unsigned long long cycle);
   ~Instruction() = default;
 
+  Instruction(const Instruction &other);
+  Instruction &operator=(const Instruction &other) = delete;
+
   friend std::ostream &operator<<(std::ostream &os, const Instruction &in);
 
   const DataT opcode;
