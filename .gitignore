@@ -5,4 +5,4 @@ build/**/*
 compile_commands.json
 test/**/*.lst
 notes.md
-./cache
+./.cache
