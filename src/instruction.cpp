@@ -50,8 +50,8 @@ Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
 
 Instruction::Instruction(const Instruction &other)
     : opcode(other.opcode), operation(other.operation), pc(other.pc),
-      addressMode(other.addressMode), issueCycle(other.issueCycle),
-      size(other.size) {}
+      addressMode(other.addressMode), address(other.address),
+      issueCycle(other.issueCycle), size(other.size) {}
 
 // TODO(oren): This is a very expensive lookup table. Refactor.
 AddressMode Instruction::decodeAddressMode() {
