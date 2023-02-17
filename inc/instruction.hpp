@@ -95,6 +95,9 @@ enum class Operation {
   nOperations
 };
 
+const std::string &GetMnemonic(Operation op);
+const std::string &GetAModeMnemonic(AddressMode am);
+
 struct Instruction {
   using AddressT = uint16_t;
   using DataT = uint8_t;

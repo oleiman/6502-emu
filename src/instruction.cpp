@@ -29,7 +29,7 @@ array<uint8_t, static_cast<int>(AddressMode::nAddressModes)> aModeSizes = {
     2        // indirect indexed
 };
 
-array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
+const array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
     "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "SAX", "ADC",
     "SBC",     "INC", "INX", "INY", "ISC", "DEC", "DEX", "DEY", "DCP", "ASL",
     "ASL",     "SLO", "LSR", "LSR", "SRE", "ROL", "ROL", "RLA", "ROR", "ROR",
@@ -38,9 +38,10 @@ array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
     "TXS",     "TYA", "JMP", "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP",
     "BRK",     "CLC", "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
 
-array<string, static_cast<int>(AddressMode::nAddressModes)> aModeMnemonics = {
-    "Imp",   "Accum", "Imm", "Abs",   "AbsX",     "AbsY",     "Zero",
-    "ZeroX", "ZeroY", "Rel", "Indir", "IdxIndir", "IndirIdx",
+const array<string, static_cast<int>(AddressMode::nAddressModes)>
+    aModeMnemonics = {
+        "Imp",   "Accum", "Imm", "Abs",   "AbsX",     "AbsY",     "Zero",
+        "ZeroX", "ZeroY", "Rel", "Indir", "IdxIndir", "IndirIdx",
 };
 
 Instruction::Instruction(DataT opcode, AddressT pc, unsigned long long cycle)
@@ -488,6 +489,13 @@ Operation Instruction::decodeOperation() {
   default:
     return Operation::illegal;
   }
+}
+
+const std::string &GetMnemonic(Operation op) {
+  return opMnemonics[static_cast<int>(op)];
+}
+const std::string &GetAModeMnemonic(AddressMode am) {
+  return aModeMnemonics[static_cast<int>(am)];
 }
 
 ostream &operator<<(ostream &os, Instruction const &in) {
