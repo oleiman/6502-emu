@@ -118,6 +118,9 @@ struct Instruction {
   const unsigned long long issueCycle;
   const DataT size;
 
+  // mutable to allow flagging by debuggers
+  mutable bool discard = false;
+
 private:
   AddressMode decodeAddressMode();
   Operation decodeOperation();

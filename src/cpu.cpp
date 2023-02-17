@@ -201,6 +201,9 @@ M6502::AddressT M6502::wrapAroundOffset(AddressT base, uint8_t offset) {
 }
 
 void M6502::dispatch(instr::Instruction const &in) {
+  if (in.discard) {
+    return;
+  }
   state_.pc += in.size;
   using instr::Operation;
   switch (in.operation) {
