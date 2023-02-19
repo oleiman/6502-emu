@@ -11,7 +11,7 @@ namespace mem {
 class Mapper {
 public:
   virtual void write(uint16_t addr, uint8_t data) = 0;
-  virtual uint8_t read(uint16_t addr) = 0;
+  virtual uint8_t read(uint16_t addr, bool dbg = false) = 0;
   virtual void tick(uint16_t) = 0;
 };
 
@@ -29,7 +29,7 @@ public:
     }
   }
 
-  uint8_t read(uint16_t addr) override {
+  uint8_t read(uint16_t addr, bool dbg) override {
     if (addr < mem_.size()) {
       return mem_[addr];
     } else {
