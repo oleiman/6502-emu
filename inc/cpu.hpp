@@ -56,6 +56,7 @@ public:
   bool &nmiPin() { return pending_nmi_; }
   bool &irqPin() { return pending_irq_; }
   CpuState const &state() { return state_; }
+  unsigned long ic() { return instruction_count_; }
 
   uint8_t debugStep(dbg::Debugger &debugger);
 
@@ -69,9 +70,13 @@ private:
     INTLINE = 0x01,
   };
   void tick() {
-    ++step_cycles_;
+    auto nmi_prev = pending_nmi_;
     for (auto &h : _tick_handlers) {
       h();
+    }
+    ++step_cycles_;
+    if (!nmi_prev && pending_nmi_) {
+      nmi_cycle_ = state_.cycle + step_cycles_;
     }
   }
 
@@ -92,6 +97,9 @@ private:
   bool pending_reset_ = false;
   bool pending_nmi_ = false;
   bool pending_irq_ = false;
+  unsigned long instruction_count_ = 0;
+  unsigned long nmi_ic_ = 0;
+  unsigned long nmi_cycle_ = 0;
   std::stack<bool> iflag_prev_;
   bool enable_bcd_;
   bool rst_override_ = false;

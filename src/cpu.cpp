@@ -63,14 +63,18 @@ void M6502::reset(AddressT init) {
 uint8_t M6502::step() {
   step_cycles_ = 0;
   if (pending_nmi_) {
-    op_Interrupt(NMI_VEC, IntSource::INTLINE);
-    pending_nmi_ = false;
+    // let one instruction pass before servicing NMI
+    if (nmi_ic_ == instruction_count_ - 1) {
+      op_Interrupt(NMI_VEC, IntSource::INTLINE);
+      pending_nmi_ = false;
+    } else {
+      nmi_ic_ = instruction_count_;
+    }
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
   } else if (pending_irq_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-    // pending_irq_ = false;
   }
 
   dispatch([&]() {
@@ -81,20 +85,24 @@ uint8_t M6502::step() {
   }());
 
   state_.cycle += step_cycles_;
+  ++instruction_count_;
   return step_cycles_;
 }
 
 uint8_t M6502::debugStep(dbg::Debugger &debugger) {
   step_cycles_ = 0;
   if (pending_nmi_) {
-    op_Interrupt(NMI_VEC, IntSource::INTLINE);
-    pending_nmi_ = false;
+    if (nmi_ic_ == instruction_count_ - 1) {
+      op_Interrupt(NMI_VEC, IntSource::INTLINE);
+      pending_nmi_ = false;
+    } else {
+      nmi_ic_ = instruction_count_;
+    }
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
   } else if (pending_irq_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-    // pending_irq_ = false;
   }
 
   dispatch(debugger.step(
@@ -107,6 +115,7 @@ uint8_t M6502::debugStep(dbg::Debugger &debugger) {
       state_, mapper_));
 
   state_.cycle += step_cycles_;
+  ++instruction_count_;
   return step_cycles_;
 }
 
@@ -204,6 +213,7 @@ void M6502::dispatch(instr::Instruction const &in) {
   if (in.discard) {
     return;
   }
+
   state_.pc += in.size;
   using instr::Operation;
   switch (in.operation) {
