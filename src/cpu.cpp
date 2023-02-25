@@ -62,20 +62,18 @@ void M6502::reset(AddressT init) {
 
 uint8_t M6502::step() {
   step_cycles_ = 0;
-  if (pending_nmi_) {
-    // let one instruction pass before servicing NMI
-    if (nmi_ic_ == instruction_count_ - 1) {
-      op_Interrupt(NMI_VEC, IntSource::INTLINE);
-      pending_nmi_ = false;
-    } else {
-      nmi_ic_ = instruction_count_;
-    }
+  if (nmi_ready_) {
+    op_Interrupt(NMI_VEC, IntSource::INTLINE);
+    pending_nmi_ = false;
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
-  } else if (pending_irq_) {
+  } else if (irq_ready_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
   }
+
+  bool irq_b4 = pending_irq_;
+  bool nmi_b4 = pending_nmi_;
 
   dispatch([&]() {
     instr::Instruction in(readByte(state_.pc), state_.pc,
@@ -84,26 +82,26 @@ uint8_t M6502::step() {
     return in;
   }());
 
+  irq_ready_ = pending_irq_ && irq_b4;
+  nmi_ready_ = pending_nmi_ && nmi_b4;
   state_.cycle += step_cycles_;
-  ++instruction_count_;
   return step_cycles_;
 }
 
 uint8_t M6502::debugStep(dbg::Debugger &debugger) {
   step_cycles_ = 0;
-  if (pending_nmi_) {
-    if (nmi_ic_ == instruction_count_ - 1) {
-      op_Interrupt(NMI_VEC, IntSource::INTLINE);
-      pending_nmi_ = false;
-    } else {
-      nmi_ic_ = instruction_count_;
-    }
+  if (nmi_ready_) {
+    op_Interrupt(NMI_VEC, IntSource::INTLINE);
+    pending_nmi_ = false;
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
-  } else if (pending_irq_) {
+  } else if (irq_ready_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
   }
+
+  bool irq_b4 = pending_irq_;
+  bool nmi_b4 = pending_nmi_;
 
   dispatch(debugger.step(
       [&]() {
@@ -114,8 +112,9 @@ uint8_t M6502::debugStep(dbg::Debugger &debugger) {
       }(),
       state_, mapper_));
 
+  irq_ready_ = pending_irq_ && irq_b4;
+  nmi_ready_ = pending_nmi_ && nmi_b4;
   state_.cycle += step_cycles_;
-  ++instruction_count_;
   return step_cycles_;
 }
 
@@ -845,7 +844,8 @@ void M6502::op_RTI() {
       static_cast<AddressT>(readByte(STACK_POINTER(state_.sp))); // tick 5
   // clear interrupt disable flag
   // NOTE(oren): spec says "restore to previous state"
-  restoreInterrupts();
+  // However...if I do this it fails some instruction tests
+  // restoreInterrupts();
   // no pc increment here, address on stack is precise return address
   op_JMP((target_hi << 8) | target_lo); // tick 6
 }

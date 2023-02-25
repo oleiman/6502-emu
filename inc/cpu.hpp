@@ -56,7 +56,6 @@ public:
   bool &nmiPin() { return pending_nmi_; }
   bool &irqPin() { return pending_irq_; }
   CpuState const &state() { return state_; }
-  unsigned long ic() { return instruction_count_; }
 
   uint8_t debugStep(dbg::Debugger &debugger);
 
@@ -96,10 +95,11 @@ private:
 
   bool pending_reset_ = false;
   bool pending_nmi_ = false;
+  bool nmi_ready_ = false;
   bool pending_irq_ = false;
-  unsigned long instruction_count_ = 0;
-  unsigned long nmi_ic_ = 0;
+  bool irq_ready_ = false;
   unsigned long nmi_cycle_ = 0;
+
   std::stack<bool> iflag_prev_;
   bool enable_bcd_;
   bool rst_override_ = false;
