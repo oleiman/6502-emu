@@ -51,7 +51,7 @@ public:
   bool loadRom(std::ifstream &infile, AddressT start);
   void initPc(AddressT val) { state_.pc = val; }
   uint8_t step();
-  void reset();
+  void reset(bool force = false);
   void reset(AddressT init);
   bool &nmiPin() { return pending_nmi_; }
   bool &irqPin() { return pending_irq_; }
@@ -94,6 +94,7 @@ private:
   mem::Mapper &mapper_;
 
   bool pending_reset_ = false;
+  bool force_reset_ = false;
   bool pending_nmi_ = false;
   bool nmi_ready_ = false;
   bool pending_irq_ = false;

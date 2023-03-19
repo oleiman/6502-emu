@@ -49,10 +49,12 @@ bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
 
 // TODO(oren): Reset should restore CPU to reset state, currently does nothing
 // but set reset line
-void M6502::reset() {
+void M6502::reset(bool force) {
   pending_reset_ = true;
   rst_override_ = false;
+  force_reset_ = force;
 }
+
 void M6502::reset(AddressT init) {
   pending_reset_ = true;
   // TODO(oren): pair...
@@ -68,6 +70,7 @@ uint8_t M6502::step() {
   } else if (pending_reset_) {
     op_Interrupt(RST_VEC, IntSource::INTLINE);
     pending_reset_ = false;
+    force_reset_ = false;
   } else if (irq_ready_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
   }
@@ -94,8 +97,10 @@ uint8_t M6502::debugStep(dbg::Debugger &debugger) {
     op_Interrupt(NMI_VEC, IntSource::INTLINE);
     pending_nmi_ = false;
   } else if (pending_reset_) {
-    op_Interrupt(RST_VEC, IntSource::INTLINE);
+    op_Interrupt(RST_VEC,
+                 (force_reset_ ? IntSource::INSTRUCTION : IntSource::INTLINE));
     pending_reset_ = false;
+    force_reset_ = false;
   } else if (irq_ready_) {
     op_Interrupt(IRQ_VEC, IntSource::INTLINE);
   }
