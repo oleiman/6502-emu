@@ -31,14 +31,14 @@ TEST_CASE("AllSuiteA", "[integration][cpu]") {
   REQUIRE(cpu.loadRom(infile, 0x4000));
   infile.close();
   // TODO(oren): finalize the decision to use reset rather than initPC here
-  cpu.reset(0x4000);
+  cpu.reset(static_cast<uint16_t>(0x4000));
 
   do {
     ++instructions;
     cpu.step();
   } while (cpu.state().pc != 0x45c0);
 
-  REQUIRE(mp.read(0x0210) == 0xff);
+  REQUIRE(mp.read(0x0210, true) == 0xff);
 
   std::cerr << report(AllSuiteA, cpu.state().cycle, instructions).str()
             << std::endl;
@@ -54,7 +54,7 @@ TEST_CASE("KlausFunctional", "[integration][cpu]") {
   std::ifstream infile(KlausFunctional, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x0000u));
   infile.close();
-  cpu.reset(0x400u);
+  cpu.reset(static_cast<uint16_t>(0x400u));
 
   dbg::Debugger d(true, false);
 
@@ -83,7 +83,7 @@ TEST_CASE("BruceClarkDecimal", "[integration][cpu]") {
   std::ifstream infile(BruceClarkDecimal, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x0200u));
   infile.close();
-  cpu.reset(0x200u);
+  cpu.reset(static_cast<uint16_t>(0x200u));
 
   // dbg::Debugger d(true, false);
 
@@ -113,7 +113,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
   std::ifstream infile(Timing, std::ios::binary);
   REQUIRE(cpu.loadRom(infile, 0x1000));
   infile.close();
-  cpu.reset(0x1000);
+  cpu.reset(static_cast<uint16_t>(0x1000));
 
   // dbg::Debugger d(true, false);
 
@@ -154,7 +154,7 @@ TEST_CASE("Timing", "[cpu][timing]") {
 //   std::ifstream infile(KlausInterrupt, std::ios::binary);
 //   REQUIRE(cpu.loadRom(infile, 0x0000u));
 //   infile.close();
-//   cpu.reset(0x400u);
+//   cpu.reset(static_cast<uint16_t>(0x400u));
 
 //   // dbg::Debugger d(true, false);
 
