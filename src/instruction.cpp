@@ -2,6 +2,7 @@
 
 #include <array>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -30,13 +31,16 @@ array<uint8_t, static_cast<int>(AddressMode::nAddressModes)> aModeSizes = {
 };
 
 const array<string, static_cast<int>(Operation::nOperations)> opMnemonics = {
-    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "STA", "STX", "STY", "SAX", "ADC",
-    "SBC",     "INC", "INX", "INY", "ISC", "DEC", "DEX", "DEY", "DCP", "ASL",
-    "ASL",     "SLO", "LSR", "LSR", "SRE", "ROL", "ROL", "RLA", "ROR", "ROR",
-    "RRA",     "AND", "ORA", "EOR", "CMP", "CPX", "CPY", "BIT", "BPL", "BVC",
-    "BCC",     "BNE", "BMI", "BVS", "BCS", "BEQ", "TAX", "TAY", "TSX", "TXA",
-    "TXS",     "TYA", "JMP", "JSR", "RTS", "RTI", "PHA", "PLA", "PHP", "PLP",
-    "BRK",     "CLC", "CLI", "CLV", "CLD", "SEC", "SEI", "SED", "NOP"};
+    "ILLEGAL", "LDA", "LDX", "LDY", "LAX", "LAS", "STA", "STX", "STY",
+    "SAX",     "ADC", "SBC", "INC", "INX", "INY", "ISC", "DEC", "DEX",
+    "DEY",     "DCP", "ASL", "ASL", "SLO", "LSR", "LSR", "SRE", "ROL",
+    "ROL",     "RLA", "ROR", "ROR", "RRA", "AND", "ANC", "ALR", "ARR",
+    "XAA",     "AXA", "AXS", "TAS", "SAY", "XAS", "ORA", "EOR", "CMP",
+    "CPX",     "CPY", "BIT", "BPL", "BVC", "BCC", "BNE", "BMI", "BVS",
+    "BCS",     "BEQ", "TAX", "TAY", "TSX", "TXA", "TXS", "TYA", "JMP",
+    "JSR",     "RTS", "RTI", "PHA", "PLA", "PHP", "PLP", "BRK", "CLC",
+    "CLI",     "CLV", "CLD", "SEC", "SEI", "SED", "NOP", "DOP", "TOP",
+};
 
 const array<string, static_cast<int>(AddressMode::nAddressModes)>
     aModeMnemonics = {
@@ -126,7 +130,7 @@ AddressMode Instruction::decodeAddressMode() {
   case 0x09:
     if (hi == 0x08) {
       // NOTE: illegal
-      return AddressMode::implicit;
+      return AddressMode::immediate;
     } else if ((hi & 0x01) == 0) {
       return AddressMode::immediate;
     } else {
@@ -151,7 +155,6 @@ AddressMode Instruction::decodeAddressMode() {
     if (hi == 0x06) {
       return AddressMode::indirect;
     } else if (hi & 0x01) {
-      // some are unofficial
       return AddressMode::absoluteX;
     } else {
       // NOTE: some are unofficial, but all are absolute
@@ -164,10 +167,7 @@ AddressMode Instruction::decodeAddressMode() {
       return AddressMode::absoluteX;
     }
   case 0x0E:
-    if (hi == 0x09) {
-      // NOTE: illegal
-      return AddressMode::implicit;
-    } else if (hi == 0x0B) {
+    if (hi == 0x0B || hi == 0x09) {
       return AddressMode::absoluteY;
     } else if ((hi & 0x01) == 0) {
       return AddressMode::absolute;
@@ -210,13 +210,16 @@ Operation Instruction::decodeOperation() {
   case 0xB4:
   case 0xBC:
     return Operation::loadY;
-  case 0xA7:
-  case 0xB7:
-  case 0xAF:
-  case 0xBF:
   case 0xA3:
+  case 0xA7:
+  case 0xAB:
+  case 0xAF:
   case 0xB3:
+  case 0xB7:
+  case 0xBF:
     return Operation::loadAX;
+  case 0xBB:
+    return Operation::loadAS;
   case 0x81:
   case 0x85:
   case 0x8D:
@@ -360,6 +363,26 @@ Operation Instruction::decodeOperation() {
   case 0x39:
   case 0x3D:
     return Operation::bwAND;
+  case 0x0B:
+  case 0x2B:
+    return Operation::bwANC;
+  case 0x4B:
+    return Operation::bwALR;
+  case 0x6B:
+    return Operation::bwARR;
+  case 0x8B:
+    return Operation::bwXAA;
+  case 0x9B:
+    return Operation::bwTAS;
+  case 0x9C:
+    return Operation::bwSAY;
+  case 0x9E:
+    return Operation::bwXAS;
+  case 0x9F:
+  case 0x93:
+    return Operation::bwAXA;
+  case 0xCB:
+    return Operation::bwAXS;
   case 0x01:
   case 0x05:
   case 0x09:
@@ -459,8 +482,6 @@ Operation Instruction::decodeOperation() {
     return Operation::setI;
   case 0xF8:
     return Operation::setD;
-  case 0x80:
-  case 0x89:
   case 0x0C:
   case 0x1C:
   case 0x3C:
@@ -484,8 +505,13 @@ Operation Instruction::decodeOperation() {
   case 0xDA:
   case 0xEA:
   case 0xFA:
-  case 0x82:
     return Operation::nop;
+  case 0x80:
+  case 0x82:
+  case 0x89:
+  case 0xC2:
+  case 0xE2:
+    return Operation::dop;
   default:
     return Operation::illegal;
   }

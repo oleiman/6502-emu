@@ -28,6 +28,7 @@ enum class Operation {
   loadX,
   loadY,
   loadAX,
+  loadAS,
   storeA,
   storeX,
   storeY,
@@ -55,6 +56,15 @@ enum class Operation {
   rotateRA,
   rotateRAdc,
   bwAND,
+  bwANC,
+  bwALR,
+  bwARR,
+  bwXAA,
+  bwAXA,
+  bwAXS,
+  bwTAS,
+  bwSAY,
+  bwXAS,
   bwOR,
   bwXOR,
   compare,
@@ -92,6 +102,8 @@ enum class Operation {
   setI,
   setD,
   nop,
+  dop,
+  top,
   nOperations
 };
 

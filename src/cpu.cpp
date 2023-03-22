@@ -1,20 +1,9 @@
 #include "cpu.hpp"
 #include "debugger.hpp"
+#include "instruction.hpp"
 
 #include <bitset>
 #include <iostream>
-
-// status byte masks
-#define CARRY_M 0b00000001u
-#define ZERO_M 0b00000010u
-// TODO(oren): looks like this is ignored everywhere
-// need to read up on where it's set/cleared
-#define INT_DISABLE_M 0b00000100u
-#define DECIMAL_M 0b00001000u
-#define BIT4_M 0b00010000u
-#define BIT5_M 0b00100000u
-#define OVERFLOW_M 0b01000000u
-#define NEGATIVE_M 0b10000000u
 
 // bit manipulation
 #define SET(X, MASK) (X |= MASK)
@@ -26,6 +15,25 @@
 #define STACK_POINTER(X) (STACK_BASE | X)
 
 namespace cpu {
+
+constexpr uint8_t BIT0 = 0b00000001u;
+constexpr uint8_t BIT1 = 0b00000010u;
+constexpr uint8_t BIT2 = 0b00000100u;
+constexpr uint8_t BIT3 = 0b00001000u;
+constexpr uint8_t BIT4 = 0b00010000u;
+constexpr uint8_t BIT5 = 0b00100000u;
+constexpr uint8_t BIT6 = 0b01000000u;
+constexpr uint8_t BIT7 = 0b10000000u;
+
+// status byte masks
+constexpr uint8_t CARRY_M = BIT0;
+constexpr uint8_t ZERO_M = BIT1;
+constexpr uint8_t INT_DISABLE_M = BIT2;
+constexpr uint8_t DECIMAL_M = BIT3;
+constexpr uint8_t BIT4_M = BIT4;
+constexpr uint8_t BIT5_M = BIT5;
+constexpr uint8_t OVERFLOW_M = BIT6;
+constexpr uint8_t NEGATIVE_M = BIT7;
 
 bool M6502::loadRom(std::ifstream &infile, M6502::AddressT start) {
   code_start_ = start;
@@ -234,6 +242,12 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_LD(state_.rA, in.address);
     state_.rX = state_.rA;
     break;
+  case Operation::loadAS:
+    state_.rA = state_.sp;
+    op_AND(in.address);
+    state_.rX = state_.rA;
+    state_.sp = state_.rA;
+    break;
   case Operation::storeA:
     op_ST(in.address, state_.rA);
     break;
@@ -262,7 +276,11 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, 1);
     break;
   case Operation::incrementSbc:
+    // op_INC(in.address, 1);
+    // op_SBC(in.address);
     op_SBCV(op_INC(in.address, 1));
+
+    // tick();
     break;
   case Operation::decrement:
     op_INC(in.address, -1);
@@ -289,7 +307,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_LSR(in.address);
     break;
   case Operation::shiftRA:
-    op_LSRV(state_.rA);
+    op_LSRA();
     break;
   case Operation::shiftRXor:
     op_EORV(op_LSR(in.address));
@@ -307,7 +325,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ROR(in.address);
     break;
   case Operation::rotateRA:
-    op_RORV(state_.rA);
+    op_RORA();
     break;
   case Operation::rotateRAdc:
     op_ADCV(op_ROR(in.address));
@@ -315,6 +333,90 @@ void M6502::dispatch(instr::Instruction const &in) {
   case Operation::bwAND:
     op_AND(in.address);
     break;
+  case Operation::bwANC:
+    op_AND(in.address);
+    setOrClearStatus(GET(state_.rA, NEGATIVE_M), CARRY_M);
+    break;
+  case Operation::bwALR:
+    op_AND(in.address);
+    op_LSRV(state_.rA);
+    break;
+  case Operation::bwARR: {
+    op_AND(in.address);
+    op_RORV(state_.rA);
+    uint8_t b5 = GET(state_.rA, BIT5);
+    uint8_t b6 = GET(state_.rA, BIT6);
+    /*
+      If both bits are 1: set C, clear V.
+      If both bits are 0: clear C and V.
+      If only bit 5 is 1: set V, clear C.
+      If only bit 6 is 1: set C and V.
+     */
+    if (b5 && b6) {
+      SET(state_.status, CARRY_M);
+      CLEAR(state_.status, OVERFLOW_M);
+    } else if (!b5 && !b6) {
+      CLEAR(state_.status, CARRY_M);
+      CLEAR(state_.status, OVERFLOW_M);
+    } else if (b5) {
+      CLEAR(state_.status, CARRY_M);
+      SET(state_.status, OVERFLOW_M);
+    } else if (b6) {
+      SET(state_.status, CARRY_M);
+      SET(state_.status, OVERFLOW_M);
+    }
+  } break;
+  case Operation::bwXAA:
+    state_.rA = state_.rX;
+    op_AND(in.address);
+    break;
+  case Operation::bwAXA: {
+    FreezeState s(state_);
+    op_ANDV(state_.rX);
+    // AND with unindexed address
+    // NOTE(oren): assuming that for the indirect indexed case the "target"
+    // address refers to the address _stored_ at the zero-page pointer
+    // possible that this should be 00 + 1 (as in upper byte of zero page addr)
+    op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
+    op_ST(in.address, state_.rA);
+  } break;
+  case Operation::bwAXS: {
+    uint8_t val = readByte(in.address);
+    state_.rX &= state_.rA;
+    op_CMPV(state_.rX, val);
+    state_.rX -= val;
+  } break;
+  case Operation::bwTAS: {
+    FreezeState s(state_);
+    op_ANDV(state_.rX);
+    state_.sp = state_.rA;
+    op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
+    op_ST(in.address, state_.rA);
+  } break;
+  case Operation::bwSAY: {
+    FreezeState s(state_);
+    auto base = in.address - state_.rX;
+    AddressT value = (base & 0xFF00) | (in.address & 0x00FF);
+    bool page_crossed = ((value >> 8) ^ (in.address >> 8));
+    if (page_crossed) {
+      value &= (state_.rX << 8);
+    }
+    state_.rA = state_.rY;
+    op_ANDV(((value >> 8) & 0xFF) + 1);
+    op_ST(value, state_.rA);
+  } break;
+  case Operation::bwXAS: {
+    FreezeState s(state_);
+    auto base = in.address - state_.rY;
+    AddressT value = (base & 0xFF00) | (in.address & 0x00FF);
+    bool page_crossed = ((value >> 8) ^ (in.address >> 8));
+    if (page_crossed) {
+      value &= (state_.rY << 8);
+    }
+    state_.rA = state_.rX;
+    op_ANDV(((value >> 8) & 0xFF) + 1);
+    op_ST(value, state_.rA);
+  } break;
   case Operation::bwOR:
     op_ORA(in.address);
     break;
@@ -427,6 +529,9 @@ void M6502::dispatch(instr::Instruction const &in) {
     break;
   case Operation::nop:
     op_NOP();
+    break;
+  case Operation::dop:
+    op_DOP(in.address);
     break;
   default:
     op_Illegal(in);
@@ -631,8 +736,14 @@ M6502::DataT M6502::op_LSR(AddressT source) {
   // dummy write
   // writeByte(source, result);
   op_LSRV(result);
+  tick();
   writeByte(source, result);
   return result;
+}
+
+void M6502::op_LSRA() {
+  op_LSRV(state_.rA);
+  tick();
 }
 
 // logical shift right on value
@@ -641,7 +752,6 @@ void M6502::op_LSRV(DataT &val) {
   val >>= 1;
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick();
 }
 
 // rotate left on memory
@@ -669,8 +779,14 @@ void M6502::op_ROLV(DataT &val) {
 M6502::DataT M6502::op_ROR(AddressT source) {
   DataT result = readByte(source);
   op_RORV(result);
+  tick();
   writeByte(source, result);
   return result;
+}
+
+void M6502::op_RORA() {
+  op_RORV(state_.rA);
+  tick();
 }
 
 void M6502::op_RORV(DataT &val) {
@@ -682,8 +798,6 @@ void M6502::op_RORV(DataT &val) {
   }
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  // TODO(oren): verify
-  tick();
 }
 
 // AND memory with accumulator
@@ -888,6 +1002,7 @@ void M6502::op_SetFlag(uint8_t select) {
 }
 
 void M6502::op_NOP() { tick(); }
+void M6502::op_DOP(AddressT target) { readByte(target); }
 
 void M6502::setOrClearStatus(bool pred, uint8_t mask) {
   if (pred) {
@@ -978,11 +1093,13 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  // always pay an extra cycle for these
   if (op == Operation::shiftL || op == Operation::shiftR ||
       op == Operation::rotateL || op == Operation::rotateR ||
       op == Operation::decrement || op == Operation::increment ||
-      op == Operation::storeA) {
+      op == Operation::storeA || op == Operation::bwSAY ||
+      op == Operation::incrementSbc || op == Operation::decrementCmp ||
+      op == Operation::shiftLOrA || op == Operation::rotateLAnd ||
+      op == Operation::shiftRXor || op == Operation::rotateRAdc) {
     tick();
     return base + state_.rX;
   }
@@ -990,12 +1107,16 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
 }
 
 M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
+  using instr::Operation;
   DataT addr_lo = readByte(state_.pc + 1);
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  // no page cross optimization for a store. always advance the clock here.
-  if (op == instr::Operation::storeA) {
+  if (op == Operation::storeA || op == Operation::incrementSbc ||
+      op == Operation::decrementCmp || op == Operation::shiftLOrA ||
+      op == Operation::rotateLAnd || op == Operation::shiftRXor ||
+      op == Operation::rotateRAdc || op == Operation::bwAXA ||
+      op == Operation::bwTAS || op == Operation::bwXAS) {
     tick();
     return base + state_.rY;
   }
@@ -1023,12 +1144,16 @@ M6502::AddressT M6502::addr_IndexedIndirect() {
 }
 
 M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
+  using instr::Operation;
   AddressT zp_addr = static_cast<AddressT>(readByte(state_.pc + 1));
   DataT addr_lo = readByte(zp_addr++);
   zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
-  if (op == instr::Operation::storeA) {
+  if (op == Operation::storeA || op == Operation::incrementSbc ||
+      op == Operation::decrementCmp || op == Operation::shiftLOrA ||
+      op == Operation::rotateLAnd || op == Operation::shiftRXor ||
+      op == Operation::rotateRAdc || op == Operation::bwAXA) {
     tick();
     return base + state_.rY;
   }
