@@ -84,6 +84,21 @@ private:
   void disableInterrupts();
   void restoreInterrupts();
 
+  struct FreezeState {
+    FreezeState() = delete;
+    FreezeState(CpuState &curr) : target_(curr), stored(curr) {}
+    ~FreezeState() {
+      target_.rA = stored.rA;
+      target_.rY = stored.rY;
+      target_.rX = stored.rX;
+      target_.status = stored.status;
+    }
+
+  private:
+    CpuState &target_;
+    CpuState stored;
+  };
+
   const static AddressT NMI_VEC = 0xFFFA;
   const static AddressT RST_VEC = 0xFFFC;
   const static AddressT IRQ_VEC = 0xFFFE;
@@ -139,10 +154,12 @@ private:
   DataT op_ASL(AddressT source);
   void op_ASLV(DataT &val);
   DataT op_LSR(AddressT source);
+  void op_LSRA();
   void op_LSRV(DataT &val);
   DataT op_ROL(AddressT source);
   void op_ROLV(DataT &val);
   DataT op_ROR(AddressT source);
+  void op_RORA();
   void op_RORV(DataT &val);
   void op_AND(AddressT source);
   void op_ANDV(DataT val);
@@ -170,6 +187,7 @@ private:
   void op_ClearFlag(uint8_t select);
   void op_SetFlag(uint8_t select);
   void op_NOP();
+  void op_DOP(AddressT target);
 
   void setOrClearStatus(bool pred, uint8_t mask);
   DataT doBinaryAdc(DataT reg, DataT addend);
