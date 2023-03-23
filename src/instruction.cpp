@@ -197,19 +197,19 @@ Operation Instruction::decodeOperation() {
   case 0xB5:
   case 0xB9:
   case 0xBD:
-    return Operation::loadA;
+    return Operation::LDA;
   case 0xA2:
   case 0xA6:
   case 0xAE:
   case 0xB6:
   case 0xBE:
-    return Operation::loadX;
+    return Operation::LDX;
   case 0xA0:
   case 0xA4:
   case 0xAC:
   case 0xB4:
   case 0xBC:
-    return Operation::loadY;
+    return Operation::LDY;
   case 0xA3:
   case 0xA7:
   case 0xAB:
@@ -217,9 +217,9 @@ Operation Instruction::decodeOperation() {
   case 0xB3:
   case 0xB7:
   case 0xBF:
-    return Operation::loadAX;
+    return Operation::LAX;
   case 0xBB:
-    return Operation::loadAS;
+    return Operation::LAS;
   case 0x81:
   case 0x85:
   case 0x8D:
@@ -227,20 +227,20 @@ Operation Instruction::decodeOperation() {
   case 0x95:
   case 0x99:
   case 0x9D:
-    return Operation::storeA;
+    return Operation::STA;
   case 0x86:
   case 0x8E:
   case 0x96:
-    return Operation::storeX;
+    return Operation::STX;
   case 0x84:
   case 0x8C:
   case 0x94:
-    return Operation::storeY;
+    return Operation::STY;
   case 0x87:
   case 0x97:
   case 0x83:
   case 0x8F:
-    return Operation::storeAX;
+    return Operation::SAX;
   case 0x61:
   case 0x65:
   case 0x69:
@@ -249,26 +249,26 @@ Operation Instruction::decodeOperation() {
   case 0x75:
   case 0x79:
   case 0x7D:
-    return Operation::add;
+    return Operation::ADC;
   case 0xE1:
   case 0xE5:
   case 0xE9:
-  case 0xEB: // unofficial
+  case 0xEB: // unofficial TODO(oren): rename USBC
   case 0xED:
   case 0xF1:
   case 0xF5:
   case 0xF9:
   case 0xFD:
-    return Operation::subtract;
+    return Operation::SBC;
   case 0xE6:
   case 0xEE:
   case 0xF6:
   case 0xFE:
-    return Operation::increment;
+    return Operation::INC;
   case 0xE8:
-    return Operation::incrementX;
+    return Operation::INX;
   case 0xC8:
-    return Operation::incrementY;
+    return Operation::INY;
   case 0xE3:
   case 0xE7:
   case 0xEF:
@@ -276,16 +276,16 @@ Operation Instruction::decodeOperation() {
   case 0xF7:
   case 0xFB:
   case 0xFF:
-    return Operation::incrementSbc;
+    return Operation::ISC;
   case 0xC6:
   case 0xCE:
   case 0xD6:
   case 0xDE:
-    return Operation::decrement;
+    return Operation::DEC;
   case 0xCA:
-    return Operation::decrementX;
+    return Operation::DEX;
   case 0x88:
-    return Operation::decrementY;
+    return Operation::DEY;
   case 0xC3:
   case 0xC7:
   case 0xCF:
@@ -293,14 +293,14 @@ Operation Instruction::decodeOperation() {
   case 0xD7:
   case 0xDB:
   case 0xDF:
-    return Operation::decrementCmp;
+    return Operation::DCP;
   case 0x06:
   case 0x0E:
   case 0x16:
   case 0x1E:
-    return Operation::shiftL;
+    return Operation::ASL;
   case 0x0A:
-    return Operation::shiftLA;
+    return Operation::ASLA;
   case 0x03:
   case 0x07:
   case 0x0F:
@@ -308,14 +308,14 @@ Operation Instruction::decodeOperation() {
   case 0x17:
   case 0x1B:
   case 0x1F:
-    return Operation::shiftLOrA;
+    return Operation::SLO;
   case 0x46:
   case 0x4E:
   case 0x56:
   case 0x5E:
-    return Operation::shiftR;
+    return Operation::LSR;
   case 0x4A:
-    return Operation::shiftRA;
+    return Operation::LSRA;
   case 0x43:
   case 0x47:
   case 0x4F:
@@ -323,14 +323,14 @@ Operation Instruction::decodeOperation() {
   case 0x57:
   case 0x5B:
   case 0x5F:
-    return Operation::shiftRXor;
+    return Operation::SRE;
   case 0x26:
   case 0x2E:
   case 0x36:
   case 0x3E:
-    return Operation::rotateL;
+    return Operation::ROL;
   case 0x2A:
-    return Operation::rotateLA;
+    return Operation::ROLA;
   case 0x23:
   case 0x27:
   case 0x2F:
@@ -338,14 +338,14 @@ Operation Instruction::decodeOperation() {
   case 0x37:
   case 0x3B:
   case 0x3F:
-    return Operation::rotateLAnd;
+    return Operation::RLA;
   case 0x66:
   case 0x6E:
   case 0x76:
   case 0x7E:
-    return Operation::rotateR;
+    return Operation::ROR;
   case 0x6A:
-    return Operation::rotateRA;
+    return Operation::RORA;
   case 0x63:
   case 0x67:
   case 0x6F:
@@ -353,7 +353,7 @@ Operation Instruction::decodeOperation() {
   case 0x77:
   case 0x7B:
   case 0x7F:
-    return Operation::rotateRAdc;
+    return Operation::RRA;
   case 0x21:
   case 0x25:
   case 0x29:
@@ -362,27 +362,27 @@ Operation Instruction::decodeOperation() {
   case 0x35:
   case 0x39:
   case 0x3D:
-    return Operation::bwAND;
+    return Operation::AND;
   case 0x0B:
   case 0x2B:
-    return Operation::bwANC;
+    return Operation::ANC;
   case 0x4B:
-    return Operation::bwALR;
+    return Operation::ALR;
   case 0x6B:
-    return Operation::bwARR;
+    return Operation::ARR;
   case 0x8B:
-    return Operation::bwXAA;
+    return Operation::XAA;
   case 0x9B:
-    return Operation::bwTAS;
+    return Operation::TAS;
   case 0x9C:
-    return Operation::bwSAY;
+    return Operation::SAY;
   case 0x9E:
-    return Operation::bwXAS;
+    return Operation::XAS;
   case 0x9F:
   case 0x93:
-    return Operation::bwAXA;
+    return Operation::AXA;
   case 0xCB:
-    return Operation::bwAXS;
+    return Operation::AXS;
   case 0x01:
   case 0x05:
   case 0x09:
@@ -391,7 +391,7 @@ Operation Instruction::decodeOperation() {
   case 0x15:
   case 0x19:
   case 0x1D:
-    return Operation::bwOR;
+    return Operation::ORA;
   case 0x41:
   case 0x45:
   case 0x49:
@@ -400,7 +400,7 @@ Operation Instruction::decodeOperation() {
   case 0x55:
   case 0x59:
   case 0x5D:
-    return Operation::bwXOR;
+    return Operation::EOR;
   case 0xC1:
   case 0xC5:
   case 0xC9:
@@ -409,79 +409,79 @@ Operation Instruction::decodeOperation() {
   case 0xD5:
   case 0xD9:
   case 0xDD:
-    return Operation::compare;
+    return Operation::CMP;
   case 0xE0:
   case 0xE4:
   case 0xEC:
-    return Operation::compareX;
+    return Operation::CPX;
   case 0xC0:
   case 0xC4:
   case 0xCC:
-    return Operation::compareY;
+    return Operation::CPY;
   case 0x24:
   case 0x2C:
-    return Operation::bitTest;
+    return Operation::BIT;
   case 0x10:
-    return Operation::branchPos;
+    return Operation::BPL;
   case 0x50:
-    return Operation::branchVC;
+    return Operation::BVC;
   case 0x90:
-    return Operation::branchCC;
+    return Operation::BCC;
   case 0xD0:
-    return Operation::branchNE;
+    return Operation::BNE;
   case 0x30:
-    return Operation::branchNeg;
+    return Operation::BMI;
   case 0x70:
-    return Operation::branchVS;
+    return Operation::BVS;
   case 0xB0:
-    return Operation::branchCS;
+    return Operation::BCS;
   case 0xF0:
-    return Operation::branchEQ;
+    return Operation::BEQ;
   case 0xAA:
-    return Operation::transferAX;
+    return Operation::TAX;
   case 0xA8:
-    return Operation::transferAY;
+    return Operation::TAY;
   case 0xBA:
-    return Operation::transferSX;
+    return Operation::TSX;
   case 0x8A:
-    return Operation::transferXA;
+    return Operation::TXA;
   case 0x9A:
-    return Operation::transferXS;
+    return Operation::TXS;
   case 0x98:
-    return Operation::transferYA;
+    return Operation::TYA;
   case 0x4C:
   case 0x6C:
-    return Operation::jump;
+    return Operation::JMP;
   case 0x20:
-    return Operation::jumpSR;
+    return Operation::JSR;
   case 0x60:
-    return Operation::returnSR;
+    return Operation::RTS;
   case 0x40:
-    return Operation::returnINT;
+    return Operation::RTI;
   case 0x48:
-    return Operation::pushA;
+    return Operation::PHA;
   case 0x68:
-    return Operation::pullA;
+    return Operation::PLA;
   case 0x08:
-    return Operation::pushS;
+    return Operation::PHP;
   case 0x28:
-    return Operation::pullS;
+    return Operation::PLP;
   case 0x00:
-    return Operation::forceBreak;
+    return Operation::BRK;
   case 0x18:
-    return Operation::clearC;
+    return Operation::CLC;
   case 0x58:
-    return Operation::clearI;
+    return Operation::CLI;
   case 0xB8:
-    return Operation::clearV;
+    return Operation::CLV;
   case 0xD8:
-    return Operation::clearD;
+    return Operation::CLD;
   case 0x38:
-    return Operation::setC;
+    return Operation::SEC;
   case 0x78:
-    return Operation::setI;
+    return Operation::SEI;
   case 0xF8:
-    return Operation::setD;
+    return Operation::SED;
   case 0x0C:
   case 0x1C:
   case 0x3C:
@@ -505,13 +505,13 @@ Operation Instruction::decodeOperation() {
   case 0xDA:
   case 0xEA:
   case 0xFA:
-    return Operation::nop;
+    return Operation::NOP;
   case 0x80:
   case 0x82:
   case 0x89:
   case 0xC2:
   case 0xE2:
-    return Operation::dop;
+    return Operation::DOP;
   default:
     return Operation::illegal;
   }

@@ -229,119 +229,119 @@ void M6502::dispatch(instr::Instruction const &in) {
   state_.pc += in.size;
   using instr::Operation;
   switch (in.operation) {
-  case Operation::loadA:
+  case Operation::LDA:
     op_LD(state_.rA, in.address);
     break;
-  case Operation::loadX:
+  case Operation::LDX:
     op_LD(state_.rX, in.address);
     break;
-  case Operation::loadY:
+  case Operation::LDY:
     op_LD(state_.rY, in.address);
     break;
-  case Operation::loadAX:
+  case Operation::LAX:
     op_LD(state_.rA, in.address);
     state_.rX = state_.rA;
     break;
-  case Operation::loadAS:
+  case Operation::LAS:
     op_LAS(in.address);
     break;
-  case Operation::storeA:
+  case Operation::STA:
     op_ST(in.address, state_.rA);
     break;
-  case Operation::storeX:
+  case Operation::STX:
     op_ST(in.address, state_.rX);
     break;
-  case Operation::storeY:
+  case Operation::STY:
     op_ST(in.address, state_.rY);
     break;
-  case Operation::storeAX:
+  case Operation::SAX:
     op_ST(in.address, state_.rA & state_.rX);
     break;
-  case Operation::add:
+  case Operation::ADC:
     op_ADC(in.address);
     break;
-  case Operation::subtract:
+  case Operation::SBC:
     op_SBC(in.address);
     break;
-  case Operation::increment:
+  case Operation::INC:
     op_INC(in.address, 1);
     break;
-  case Operation::incrementX:
+  case Operation::INX:
     op_INR(state_.rX, 1);
     break;
-  case Operation::incrementY:
+  case Operation::INY:
     op_INR(state_.rY, 1);
     break;
-  case Operation::incrementSbc:
+  case Operation::ISC:
     op_SBCV(op_INC(in.address, 1));
     break;
-  case Operation::decrement:
+  case Operation::DEC:
     op_INC(in.address, -1);
     break;
-  case Operation::decrementX:
+  case Operation::DEX:
     op_INR(state_.rX, -1);
     break;
-  case Operation::decrementY:
+  case Operation::DEY:
     op_INR(state_.rY, -1);
     break;
-  case Operation::decrementCmp:
+  case Operation::DCP:
     op_CMPV(state_.rA, op_INC(in.address, -1));
     break;
-  case Operation::shiftL:
+  case Operation::ASL:
     op_ASL(in.address);
     break;
-  case Operation::shiftLA:
+  case Operation::ASLA:
     op_ASLV(state_.rA);
     break;
-  case Operation::shiftLOrA:
+  case Operation::SLO:
     op_ORAV(op_ASL(in.address));
     break;
-  case Operation::shiftR:
+  case Operation::LSR:
     op_LSR(in.address);
     break;
-  case Operation::shiftRA:
+  case Operation::LSRA:
     op_LSRA();
     break;
-  case Operation::shiftRXor:
+  case Operation::SRE:
     op_EORV(op_LSR(in.address));
     break;
-  case Operation::rotateL:
+  case Operation::ROL:
     op_ROL(in.address);
     break;
-  case Operation::rotateLA:
+  case Operation::ROLA:
     op_ROLV(state_.rA);
     break;
-  case Operation::rotateLAnd:
+  case Operation::RLA:
     op_ANDV(op_ROL(in.address));
     break;
-  case Operation::rotateR:
+  case Operation::ROR:
     op_ROR(in.address);
     break;
-  case Operation::rotateRA:
+  case Operation::RORA:
     op_RORA();
     break;
-  case Operation::rotateRAdc:
+  case Operation::RRA:
     op_ADCV(op_ROR(in.address));
     break;
-  case Operation::bwAND:
+  case Operation::AND:
     op_AND(in.address);
     break;
-  case Operation::bwANC:
+  case Operation::ANC:
     op_AND(in.address);
     setOrClearStatus(GET(state_.rA, NEGATIVE_M), CARRY_M);
     break;
-  case Operation::bwALR:
+  case Operation::ALR:
     op_AND(in.address);
     op_LSRV(state_.rA);
     break;
-  case Operation::bwARR:
+  case Operation::ARR:
     op_ARR(in.address);
     break;
-  case Operation::bwXAA:
+  case Operation::XAA:
     state_.rA = state_.rX;
     op_AND(in.address);
     break;
-  case Operation::bwAXA: {
+  case Operation::AXA: {
     FreezeState s(state_);
     op_ANDV(state_.rX);
     // AND with unindexed address
@@ -351,134 +351,134 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
     op_ST(in.address, state_.rA);
   } break;
-  case Operation::bwAXS:
+  case Operation::AXS:
     op_AXS(readByte(in.address));
     break;
-  case Operation::bwTAS: {
+  case Operation::TAS: {
     FreezeState s(state_);
     op_ANDV(state_.rX);
     state_.sp = state_.rA;
     op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
     op_ST(in.address, state_.rA);
   } break;
-  case Operation::bwSAY:
+  case Operation::SAY:
     op_SAY(in.address);
     break;
-  case Operation::bwXAS: {
+  case Operation::XAS: {
     op_XAS(in.address);
   } break;
-  case Operation::bwOR:
+  case Operation::ORA:
     op_ORA(in.address);
     break;
-  case Operation::bwXOR:
+  case Operation::EOR:
     op_EOR(in.address);
     break;
-  case Operation::compare:
+  case Operation::CMP:
     op_CMP(state_.rA, in.address);
     break;
-  case Operation::compareX:
+  case Operation::CPX:
     op_CMP(state_.rX, in.address);
     break;
-  case Operation::compareY:
+  case Operation::CPY:
     op_CMP(state_.rY, in.address);
     break;
-  case Operation::bitTest:
+  case Operation::BIT:
     op_BIT(in.address);
     break;
-  case Operation::branchPos:
+  case Operation::BPL:
     op_BRClear(NEGATIVE_M, in.address);
     break;
-  case Operation::branchVC:
+  case Operation::BVC:
     op_BRClear(OVERFLOW_M, in.address);
     break;
-  case Operation::branchCC:
+  case Operation::BCC:
     op_BRClear(CARRY_M, in.address);
     break;
-  case Operation::branchNE:
+  case Operation::BNE:
     op_BRClear(ZERO_M, in.address);
     break;
-  case Operation::branchNeg:
+  case Operation::BMI:
     op_BRSet(NEGATIVE_M, in.address);
     break;
-  case Operation::branchVS:
+  case Operation::BVS:
     op_BRSet(OVERFLOW_M, in.address);
     break;
-  case Operation::branchCS:
+  case Operation::BCS:
     op_BRSet(CARRY_M, in.address);
     break;
-  case Operation::branchEQ:
+  case Operation::BEQ:
     op_BRSet(ZERO_M, in.address);
     break;
-  case Operation::transferAX:
+  case Operation::TAX:
     op_XFER(state_.rA, state_.rX);
     break;
-  case Operation::transferAY:
+  case Operation::TAY:
     op_XFER(state_.rA, state_.rY);
     break;
-  case Operation::transferSX:
+  case Operation::TSX:
     op_XFER(state_.sp, state_.rX);
     break;
-  case Operation::transferXA:
+  case Operation::TXA:
     op_XFER(state_.rX, state_.rA);
     break;
-  case Operation::transferXS:
+  case Operation::TXS:
     op_TXS();
     break;
-  case Operation::transferYA:
+  case Operation::TYA:
     op_XFER(state_.rY, state_.rA);
     break;
-  case Operation::jump:
+  case Operation::JMP:
     state_.pc = in.address;
     break;
-  case Operation::jumpSR:
+  case Operation::JSR:
     op_JSR(in.address);
     break;
-  case Operation::returnSR:
+  case Operation::RTS:
     op_RTS();
     break;
-  case Operation::returnINT:
+  case Operation::RTI:
     op_RTI();
     break;
-  case Operation::pushA:
+  case Operation::PHA:
     op_PHA();
     break;
-  case Operation::pullA:
+  case Operation::PLA:
     op_PLA();
     break;
-  case Operation::pushS:
+  case Operation::PHP:
     op_PHP();
     break;
-  case Operation::pullS:
+  case Operation::PLP:
     op_PLP();
     break;
-  case Operation::forceBreak:
+  case Operation::BRK:
     op_BRK();
     break;
-  case Operation::clearC:
+  case Operation::CLC:
     op_ClearFlag(CARRY_M);
     break;
-  case Operation::clearI:
+  case Operation::CLI:
     op_ClearFlag(INT_DISABLE_M);
     break;
-  case Operation::clearV:
+  case Operation::CLV:
     op_ClearFlag(OVERFLOW_M);
     break;
-  case Operation::clearD:
+  case Operation::CLD:
     op_ClearFlag(DECIMAL_M);
     break;
-  case Operation::setC:
+  case Operation::SEC:
     op_SetFlag(CARRY_M);
     break;
-  case Operation::setI:
+  case Operation::SEI:
     op_SetFlag(INT_DISABLE_M);
     break;
-  case Operation::setD:
+  case Operation::SED:
     op_SetFlag(DECIMAL_M);
     break;
-  case Operation::nop:
+  case Operation::NOP:
     op_NOP();
     break;
-  case Operation::dop:
+  case Operation::DOP:
     op_DOP(in.address);
     break;
   default:
@@ -807,6 +807,7 @@ void M6502::op_SAY(AddressT target) {
   op_ANDV(((value >> 8) & 0xFF) + 1);
   op_ST(value, state_.rA);
 }
+
 void M6502::op_XAS(AddressT target) {
   FreezeState s(state_);
   auto base = target - state_.rY;
@@ -1105,13 +1106,11 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (op == Operation::shiftL || op == Operation::shiftR ||
-      op == Operation::rotateL || op == Operation::rotateR ||
-      op == Operation::decrement || op == Operation::increment ||
-      op == Operation::storeA || op == Operation::bwSAY ||
-      op == Operation::incrementSbc || op == Operation::decrementCmp ||
-      op == Operation::shiftLOrA || op == Operation::rotateLAnd ||
-      op == Operation::shiftRXor || op == Operation::rotateRAdc) {
+  if (op == Operation::ASL || op == Operation::LSR || op == Operation::ROL ||
+      op == Operation::ROR || op == Operation::DEC || op == Operation::INC ||
+      op == Operation::STA || op == Operation::SAY || op == Operation::ISC ||
+      op == Operation::DCP || op == Operation::SLO || op == Operation::RLA ||
+      op == Operation::SRE || op == Operation::RRA) {
     tick();
     return base + state_.rX;
   }
@@ -1124,11 +1123,10 @@ M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (op == Operation::storeA || op == Operation::incrementSbc ||
-      op == Operation::decrementCmp || op == Operation::shiftLOrA ||
-      op == Operation::rotateLAnd || op == Operation::shiftRXor ||
-      op == Operation::rotateRAdc || op == Operation::bwAXA ||
-      op == Operation::bwTAS || op == Operation::bwXAS) {
+  if (op == Operation::STA || op == Operation::ISC || op == Operation::DCP ||
+      op == Operation::SLO || op == Operation::RLA || op == Operation::SRE ||
+      op == Operation::RRA || op == Operation::AXA || op == Operation::TAS ||
+      op == Operation::XAS) {
     tick();
     return base + state_.rY;
   }
@@ -1162,10 +1160,9 @@ M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
   zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
-  if (op == Operation::storeA || op == Operation::incrementSbc ||
-      op == Operation::decrementCmp || op == Operation::shiftLOrA ||
-      op == Operation::rotateLAnd || op == Operation::shiftRXor ||
-      op == Operation::rotateRAdc || op == Operation::bwAXA) {
+  if (op == Operation::STA || op == Operation::ISC || op == Operation::DCP ||
+      op == Operation::SLO || op == Operation::RLA || op == Operation::SRE ||
+      op == Operation::RRA || op == Operation::AXA) {
     tick();
     return base + state_.rY;
   }
