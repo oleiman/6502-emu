@@ -243,10 +243,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     state_.rX = state_.rA;
     break;
   case Operation::loadAS:
-    state_.rA = state_.sp;
-    op_AND(in.address);
-    state_.rX = state_.rA;
-    state_.sp = state_.rA;
+    op_LAS(in.address);
     break;
   case Operation::storeA:
     op_ST(in.address, state_.rA);
@@ -276,11 +273,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_INR(state_.rY, 1);
     break;
   case Operation::incrementSbc:
-    // op_INC(in.address, 1);
-    // op_SBC(in.address);
     op_SBCV(op_INC(in.address, 1));
-
-    // tick();
     break;
   case Operation::decrement:
     op_INC(in.address, -1);
@@ -341,31 +334,9 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_AND(in.address);
     op_LSRV(state_.rA);
     break;
-  case Operation::bwARR: {
-    op_AND(in.address);
-    op_RORV(state_.rA);
-    uint8_t b5 = GET(state_.rA, BIT5);
-    uint8_t b6 = GET(state_.rA, BIT6);
-    /*
-      If both bits are 1: set C, clear V.
-      If both bits are 0: clear C and V.
-      If only bit 5 is 1: set V, clear C.
-      If only bit 6 is 1: set C and V.
-     */
-    if (b5 && b6) {
-      SET(state_.status, CARRY_M);
-      CLEAR(state_.status, OVERFLOW_M);
-    } else if (!b5 && !b6) {
-      CLEAR(state_.status, CARRY_M);
-      CLEAR(state_.status, OVERFLOW_M);
-    } else if (b5) {
-      CLEAR(state_.status, CARRY_M);
-      SET(state_.status, OVERFLOW_M);
-    } else if (b6) {
-      SET(state_.status, CARRY_M);
-      SET(state_.status, OVERFLOW_M);
-    }
-  } break;
+  case Operation::bwARR:
+    op_ARR(in.address);
+    break;
   case Operation::bwXAA:
     state_.rA = state_.rX;
     op_AND(in.address);
@@ -380,12 +351,9 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
     op_ST(in.address, state_.rA);
   } break;
-  case Operation::bwAXS: {
-    uint8_t val = readByte(in.address);
-    state_.rX &= state_.rA;
-    op_CMPV(state_.rX, val);
-    state_.rX -= val;
-  } break;
+  case Operation::bwAXS:
+    op_AXS(readByte(in.address));
+    break;
   case Operation::bwTAS: {
     FreezeState s(state_);
     op_ANDV(state_.rX);
@@ -393,29 +361,11 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
     op_ST(in.address, state_.rA);
   } break;
-  case Operation::bwSAY: {
-    FreezeState s(state_);
-    auto base = in.address - state_.rX;
-    AddressT value = (base & 0xFF00) | (in.address & 0x00FF);
-    bool page_crossed = ((value >> 8) ^ (in.address >> 8));
-    if (page_crossed) {
-      value &= (state_.rX << 8);
-    }
-    state_.rA = state_.rY;
-    op_ANDV(((value >> 8) & 0xFF) + 1);
-    op_ST(value, state_.rA);
-  } break;
+  case Operation::bwSAY:
+    op_SAY(in.address);
+    break;
   case Operation::bwXAS: {
-    FreezeState s(state_);
-    auto base = in.address - state_.rY;
-    AddressT value = (base & 0xFF00) | (in.address & 0x00FF);
-    bool page_crossed = ((value >> 8) ^ (in.address >> 8));
-    if (page_crossed) {
-      value &= (state_.rY << 8);
-    }
-    state_.rA = state_.rX;
-    op_ANDV(((value >> 8) & 0xFF) + 1);
-    op_ST(value, state_.rA);
+    op_XAS(in.address);
   } break;
   case Operation::bwOR:
     op_ORA(in.address);
@@ -473,14 +423,12 @@ void M6502::dispatch(instr::Instruction const &in) {
     break;
   case Operation::transferXS:
     op_TXS();
-    // op_XFER(state_.rX, state_.sp);
     break;
   case Operation::transferYA:
     op_XFER(state_.rY, state_.rA);
     break;
   case Operation::jump:
     state_.pc = in.address;
-    // op_JMP(in.address);
     break;
   case Operation::jumpSR:
     op_JSR(in.address);
@@ -608,6 +556,13 @@ void M6502::op_LD(DataT &dest, AddressT source) {
   dest = readByte(source);
   setOrClearStatus(GET(dest, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(dest == 0, ZERO_M);
+}
+
+void M6502::op_LAS(AddressT source) {
+  state_.rA = state_.sp;
+  op_AND(source);
+  state_.rX = state_.rA;
+  state_.sp = state_.rA;
 }
 
 // store
@@ -806,6 +761,63 @@ void M6502::op_ANDV(DataT val) {
   state_.rA &= val;
   setOrClearStatus(GET(state_.rA, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(state_.rA == 0, ZERO_M);
+}
+
+void M6502::op_ARR(AddressT source) {
+  op_AND(source);
+  op_RORV(state_.rA);
+  uint8_t b5 = GET(state_.rA, BIT5);
+  uint8_t b6 = GET(state_.rA, BIT6);
+  /*
+    If both bits are 1: set C, clear V.
+    If both bits are 0: clear C and V.
+    If only bit 5 is 1: set V, clear C.
+    If only bit 6 is 1: set C and V.
+   */
+  if (b5 && b6) {
+    SET(state_.status, CARRY_M);
+    CLEAR(state_.status, OVERFLOW_M);
+  } else if (!b5 && !b6) {
+    CLEAR(state_.status, CARRY_M);
+    CLEAR(state_.status, OVERFLOW_M);
+  } else if (b5) {
+    CLEAR(state_.status, CARRY_M);
+    SET(state_.status, OVERFLOW_M);
+  } else if (b6) {
+    SET(state_.status, CARRY_M);
+    SET(state_.status, OVERFLOW_M);
+  }
+}
+
+void M6502::op_AXS(DataT val) {
+  state_.rX &= state_.rA;
+  op_CMPV(state_.rX, val);
+  state_.rX -= val;
+}
+
+void M6502::op_SAY(AddressT target) {
+  FreezeState s(state_);
+  auto base = target - state_.rX;
+  AddressT value = (base & 0xFF00) | (target & 0x00FF);
+  bool page_crossed = ((value >> 8) ^ (target >> 8));
+  if (page_crossed) {
+    value &= (state_.rX << 8);
+  }
+  state_.rA = state_.rY;
+  op_ANDV(((value >> 8) & 0xFF) + 1);
+  op_ST(value, state_.rA);
+}
+void M6502::op_XAS(AddressT target) {
+  FreezeState s(state_);
+  auto base = target - state_.rY;
+  AddressT value = (base & 0xFF00) | (target & 0x00FF);
+  bool page_crossed = ((value >> 8) ^ (target >> 8));
+  if (page_crossed) {
+    value &= (state_.rY << 8);
+  }
+  state_.rA = state_.rX;
+  op_ANDV(((value >> 8) & 0xFF) + 1);
+  op_ST(value, state_.rA);
 }
 
 // OR memory with accumulator
