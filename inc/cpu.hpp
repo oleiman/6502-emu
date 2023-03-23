@@ -144,6 +144,7 @@ private:
   void op_Illegal(instr::Instruction const &in);
   void op_Interrupt(AddressT vec, IntSource src);
   void op_LD(DataT &dest, AddressT source);
+  void op_LAS(AddressT source);
   void op_ST(AddressT dest, DataT data);
   void op_ADC(AddressT source);
   void op_ADCV(DataT addend);
@@ -163,6 +164,10 @@ private:
   void op_RORV(DataT &val);
   void op_AND(AddressT source);
   void op_ANDV(DataT val);
+  void op_ARR(AddressT source);
+  void op_AXS(DataT val);
+  void op_SAY(AddressT target);
+  void op_XAS(AddressT target);
   void op_ORA(AddressT source);
   void op_ORAV(DataT val);
   void op_EOR(AddressT source);
