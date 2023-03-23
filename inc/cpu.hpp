@@ -153,11 +153,13 @@ private:
   DataT op_INC(AddressT source, int8_t val);
   void op_INR(DataT &reg, int8_t val);
   DataT op_ASL(AddressT source);
+  void op_ASLA();
   void op_ASLV(DataT &val);
   DataT op_LSR(AddressT source);
   void op_LSRA();
   void op_LSRV(DataT &val);
   DataT op_ROL(AddressT source);
+  void op_ROLA();
   void op_ROLV(DataT &val);
   DataT op_ROR(AddressT source);
   void op_RORA();
@@ -197,9 +199,9 @@ private:
   void setOrClearStatus(bool pred, uint8_t mask);
   DataT doBinaryAdc(DataT reg, DataT addend);
 
-  AddressT addr_Accumulator();
+  AddressT addr_Accumulator(AddressT pc);
   AddressT addr_Immediate();
-  AddressT addr_Implicit();
+  AddressT addr_Implicit(AddressT pc);
   AddressT addr_Absolute();
   AddressT addr_ZeroPage();
   AddressT addr_Relative();

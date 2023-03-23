@@ -76,7 +76,8 @@ uint8_t M6502::step() {
     op_Interrupt(NMI_VEC, IntSource::INTLINE);
     pending_nmi_ = false;
   } else if (pending_reset_) {
-    op_Interrupt(RST_VEC, IntSource::INTLINE);
+    op_Interrupt(RST_VEC,
+                 (force_reset_ ? IntSource::INSTRUCTION : IntSource::INTLINE));
     pending_reset_ = false;
     force_reset_ = false;
   } else if (irq_ready_) {
@@ -176,7 +177,7 @@ M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
   using instr::AddressMode;
   switch (in.addressMode) {
   case AddressMode::accumulator:
-    return addr_Accumulator();
+    return addr_Accumulator(in.pc);
   case AddressMode::immediate:
     return addr_Immediate();
   case AddressMode::absolute:
@@ -200,7 +201,7 @@ M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
   case AddressMode::indirectIndexed:
     return addr_IndirectIndexed(in.operation);
   default:
-    return addr_Implicit();
+    return addr_Implicit(in.pc);
   }
 }
 
@@ -291,7 +292,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ASL(in.address);
     break;
   case Operation::ASLA:
-    op_ASLV(state_.rA);
+    op_ASLA();
     break;
   case Operation::SLO:
     op_ORAV(op_ASL(in.address));
@@ -309,7 +310,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     op_ROL(in.address);
     break;
   case Operation::ROLA:
-    op_ROLV(state_.rA);
+    op_ROLA();
     break;
   case Operation::RLA:
     op_ANDV(op_ROL(in.address));
@@ -532,11 +533,12 @@ void M6502::op_Interrupt(AddressT vec, IntSource src) {
     }
     op_PUSH(tmp); // tick 4
   } else {
-    state_ = CpuState();
     tick();
-    op_PUSH(0x00);
-    op_PUSH(0x00);
-    op_PUSH(0x00);
+    state_.status |= 0x04;
+    state_.sp -= 3;
+    tick();
+    tick();
+    tick();
   }
 
   DataT target_lo = readByte(vec);                               // tick 5
@@ -671,10 +673,15 @@ void M6502::op_INR(DataT &reg, int8_t val) {
 // arithmetic shift left (read/modify/write)
 M6502::DataT M6502::op_ASL(AddressT source) {
   DataT result = readByte(source);
-  // writeByte(source, result);
+  writeByte(source, result);
   op_ASLV(result);
   writeByte(source, result);
   return result;
+}
+
+void M6502::op_ASLA() {
+  op_ASLV(state_.rA);
+  tick();
 }
 
 void M6502::op_ASLV(DataT &val) {
@@ -682,16 +689,14 @@ void M6502::op_ASLV(DataT &val) {
   val <<= 1;
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick();
 }
 
 // logical shift right on memory
 M6502::DataT M6502::op_LSR(AddressT source) {
   DataT result = readByte(source);
   // dummy write
-  // writeByte(source, result);
+  writeByte(source, result);
   op_LSRV(result);
-  tick();
   writeByte(source, result);
   return result;
 }
@@ -712,9 +717,15 @@ void M6502::op_LSRV(DataT &val) {
 // rotate left on memory
 M6502::DataT M6502::op_ROL(AddressT source) {
   DataT result = readByte(source);
+  writeByte(source, result);
   op_ROLV(result);
   writeByte(source, result);
   return result;
+}
+
+void M6502::op_ROLA() {
+  op_ROLV(state_.rA);
+  tick();
 }
 
 // rotate left on value
@@ -727,14 +738,13 @@ void M6502::op_ROLV(DataT &val) {
   }
   setOrClearStatus(GET(val, NEGATIVE_M), NEGATIVE_M);
   setOrClearStatus(val == 0, ZERO_M);
-  tick();
 }
 
 // rotate right on memory
 M6502::DataT M6502::op_ROR(AddressT source) {
   DataT result = readByte(source);
+  writeByte(source, result);
   op_RORV(result);
-  tick();
   writeByte(source, result);
   return result;
 }
@@ -1047,13 +1057,15 @@ M6502::DataT M6502::doBinaryAdc(DataT reg, DataT addend) {
   return static_cast<DataT>(result);
 }
 
-M6502::AddressT M6502::addr_Implicit() {
-  // not used
+M6502::AddressT M6502::addr_Implicit(AddressT pc) {
+  // dummy read
+  mapper_.read(pc + 1);
   return 0;
 }
 
-M6502::AddressT M6502::addr_Accumulator() {
-  // not used
+M6502::AddressT M6502::addr_Accumulator(AddressT pc) {
+  // dummy read
+  mapper_.read(pc + 1);
   return 0;
 }
 
