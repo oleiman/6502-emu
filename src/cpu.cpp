@@ -205,14 +205,9 @@ M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
   }
 }
 
-M6502::AddressT M6502::penalizedOffset(AddressT base, uint8_t offset) {
+bool M6502::penalizedOffset(AddressT base, uint8_t offset) {
   AddressT result = base + offset;
-
-  // crossing page boundary?
-  if ((base >> 8) ^ (result >> 8)) {
-    tick();
-  }
-  return result;
+  return ((base >> 8) ^ (result >> 8));
 }
 
 M6502::AddressT M6502::wrapAroundOffset(AddressT base, uint8_t offset) {
@@ -1118,15 +1113,18 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (op == Operation::ASL || op == Operation::LSR || op == Operation::ROL ||
-      op == Operation::ROR || op == Operation::DEC || op == Operation::INC ||
-      op == Operation::STA || op == Operation::SAY || op == Operation::ISC ||
-      op == Operation::DCP || op == Operation::SLO || op == Operation::RLA ||
-      op == Operation::SRE || op == Operation::RRA) {
+  if (penalizedOffset(base, state_.rX)) {
     tick();
-    return base + state_.rX;
+  } else if (op == Operation::ASL || op == Operation::LSR ||
+             op == Operation::ROL || op == Operation::ROR ||
+             op == Operation::DEC || op == Operation::INC ||
+             op == Operation::STA || op == Operation::SAY ||
+             op == Operation::ISC || op == Operation::DCP ||
+             op == Operation::SLO || op == Operation::RLA ||
+             op == Operation::SRE || op == Operation::RRA) {
+    tick();
   }
-  return penalizedOffset(base, state_.rX);
+  return base + state_.rX;
 }
 
 M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
@@ -1135,14 +1133,16 @@ M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (op == Operation::STA || op == Operation::ISC || op == Operation::DCP ||
-      op == Operation::SLO || op == Operation::RLA || op == Operation::SRE ||
-      op == Operation::RRA || op == Operation::AXA || op == Operation::TAS ||
-      op == Operation::XAS) {
+  if (penalizedOffset(base, state_.rY)) {
     tick();
-    return base + state_.rY;
+  } else if (op == Operation::STA || op == Operation::ISC ||
+             op == Operation::DCP || op == Operation::SLO ||
+             op == Operation::RLA || op == Operation::SRE ||
+             op == Operation::RRA || op == Operation::AXA ||
+             op == Operation::TAS || op == Operation::XAS) {
+    readByte(base + state_.rY);
   }
-  return penalizedOffset(base, state_.rY);
+  return base + state_.rY;
 }
 
 M6502::AddressT M6502::addr_ZeroPageX() {
@@ -1172,13 +1172,16 @@ M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
   zp_addr &= 0xFF;
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
-  if (op == Operation::STA || op == Operation::ISC || op == Operation::DCP ||
-      op == Operation::SLO || op == Operation::RLA || op == Operation::SRE ||
-      op == Operation::RRA || op == Operation::AXA) {
+
+  if (penalizedOffset(base, state_.rY)) {
     tick();
-    return base + state_.rY;
+  } else if (op == Operation::STA || op == Operation::ISC ||
+             op == Operation::DCP || op == Operation::SLO ||
+             op == Operation::RLA || op == Operation::SRE ||
+             op == Operation::RRA || op == Operation::AXA) {
+    tick();
   }
-  return penalizedOffset(base, state_.rY);
+  return base + state_.rY;
 }
 
 } // namespace cpu

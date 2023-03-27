@@ -134,7 +134,7 @@ private:
   AddressT calculateAddress(instr::Instruction const &in);
 
   // Compute offset address, tick clock if page boundary crossed
-  AddressT penalizedOffset(AddressT base, uint8_t offset);
+  bool penalizedOffset(AddressT base, uint8_t offset);
   AddressT wrapAroundOffset(AddressT base, uint8_t offset);
   void dispatch(instr::Instruction const &in);
 
