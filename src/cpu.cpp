@@ -205,7 +205,7 @@ M6502::AddressT M6502::calculateAddress(instr::Instruction const &in) {
   }
 }
 
-bool M6502::penalizedOffset(AddressT base, uint8_t offset) {
+bool M6502::crossesPage(AddressT base, uint8_t offset) {
   AddressT result = base + offset;
   return ((base >> 8) ^ (result >> 8));
 }
@@ -1113,8 +1113,8 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (penalizedOffset(base, state_.rX)) {
-    tick();
+  if (crossesPage(base, state_.rX)) {
+    readByte((base + state_.rX) - 0x100);
   } else if (op == Operation::ASL || op == Operation::LSR ||
              op == Operation::ROL || op == Operation::ROR ||
              op == Operation::DEC || op == Operation::INC ||
@@ -1122,7 +1122,7 @@ M6502::AddressT M6502::addr_AbsoluteX(instr::Operation op) {
              op == Operation::ISC || op == Operation::DCP ||
              op == Operation::SLO || op == Operation::RLA ||
              op == Operation::SRE || op == Operation::RRA) {
-    tick();
+    readByte(base + state_.rX);
   }
   return base + state_.rX;
 }
@@ -1133,8 +1133,8 @@ M6502::AddressT M6502::addr_AbsoluteY(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(state_.pc + 2));
   AddressT base = (addr_hi << 8) | addr_lo;
 
-  if (penalizedOffset(base, state_.rY)) {
-    tick();
+  if (crossesPage(base, state_.rY)) {
+    readByte((base + state_.rY) - 0x100);
   } else if (op == Operation::STA || op == Operation::ISC ||
              op == Operation::DCP || op == Operation::SLO ||
              op == Operation::RLA || op == Operation::SRE ||
@@ -1173,8 +1173,8 @@ M6502::AddressT M6502::addr_IndirectIndexed(instr::Operation op) {
   AddressT addr_hi = static_cast<AddressT>(readByte(zp_addr));
   AddressT base = ((addr_hi << 8) | addr_lo);
 
-  if (penalizedOffset(base, state_.rY)) {
-    tick();
+  if (crossesPage(base, state_.rY)) {
+    readByte((base + state_.rY) - 0x100);
   } else if (op == Operation::STA || op == Operation::ISC ||
              op == Operation::DCP || op == Operation::SLO ||
              op == Operation::RLA || op == Operation::SRE ||
