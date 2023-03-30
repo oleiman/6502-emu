@@ -51,6 +51,7 @@ public:
   bool loadRom(std::ifstream &infile, AddressT start);
   void initPc(AddressT val) { state_.pc = val; }
   uint8_t step();
+  void stall(unsigned long cycles) { stall_cycles_ += cycles; }
   void reset(bool force = false);
   void reset(AddressT init);
   bool &nmiPin() { return pending_nmi_; }
@@ -105,6 +106,7 @@ private:
 
   CpuState state_;
   uint8_t step_cycles_;
+  unsigned long stall_cycles_ = 0;
 
   mem::Mapper &mapper_;
 

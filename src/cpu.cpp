@@ -71,6 +71,11 @@ void M6502::reset(AddressT init) {
 }
 
 uint8_t M6502::step() {
+  while (stall_cycles_ > 0) {
+    tick();
+    --stall_cycles_;
+  }
+
   step_cycles_ = 0;
   if (nmi_ready_) {
     op_Interrupt(NMI_VEC, IntSource::INTLINE);
@@ -101,6 +106,10 @@ uint8_t M6502::step() {
 }
 
 uint8_t M6502::debugStep(dbg::Debugger &debugger) {
+  while (stall_cycles_ > 0) {
+    tick();
+    --stall_cycles_;
+  }
   step_cycles_ = 0;
   if (nmi_ready_) {
     op_Interrupt(NMI_VEC, IntSource::INTLINE);
