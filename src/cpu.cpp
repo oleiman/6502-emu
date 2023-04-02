@@ -70,6 +70,36 @@ void M6502::reset(AddressT init) {
   init_pc_ = init;
 }
 
+void M6502::handleInterrupts() {
+  if (nmi_ready_) {
+    pending_nmi_ = false;
+    op_Interrupt(NMI_VEC, IntSource::INTLINE_FORCE);
+  } else if (pending_reset_) {
+    op_Interrupt(RST_VEC, (force_reset_ ? IntSource::INTLINE_FORCE
+                                        : IntSource::INTLINE));
+    pending_reset_ = false;
+    force_reset_ = false;
+  } else if (irq_ready_) {
+    // irq_ready only set if the INT_DISABLE bit was CLEAR _before_ the previous
+    // instruction, so there's no need to mask it off in op_Interrupt
+    op_Interrupt(IRQ_VEC, IntSource::INTLINE_FORCE);
+  }
+}
+
+void M6502::pollIrq() {
+  auto tmp = pending_irq_ && !GET(state_.status, INT_DISABLE_M);
+  if (!irq_detect_ && tmp) {
+    irq_detect_cycle_ = step_cycles_;
+  }
+  irq_detect_ = tmp;
+}
+void M6502::pollNmi() {
+  if (!nmi_detect_ && pending_nmi_) {
+    nmi_detect_cycle_ = step_cycles_;
+  }
+  nmi_detect_ = pending_nmi_;
+}
+
 uint8_t M6502::step() {
   while (stall_cycles_ > 0) {
     tick();
@@ -77,30 +107,25 @@ uint8_t M6502::step() {
   }
 
   step_cycles_ = 0;
-  if (nmi_ready_) {
-    op_Interrupt(NMI_VEC, IntSource::INTLINE);
-    pending_nmi_ = false;
-  } else if (pending_reset_) {
-    op_Interrupt(RST_VEC,
-                 (force_reset_ ? IntSource::INSTRUCTION : IntSource::INTLINE));
-    pending_reset_ = false;
-    force_reset_ = false;
-  } else if (irq_ready_) {
-    op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-  }
-
-  bool irq_b4 = pending_irq_;
-  bool nmi_b4 = pending_nmi_;
+  handleInterrupts();
 
   dispatch([&]() {
     instr::Instruction in(readByte(state_.pc), state_.pc,
                           state_.cycle + step_cycles_);
+    pollIrq();
     in.address = calculateAddress(in);
     return in;
   }());
 
-  irq_ready_ = pending_irq_ && irq_b4;
-  nmi_ready_ = pending_nmi_ && nmi_b4;
+  if (nmi_detect_ && (nmi_detect_cycle_ == step_cycles_)) {
+    nmi_detect_ = false;
+    nmi_detect_cycle_ = 0;
+  } else if (nmi_detect_) {
+    irq_detect_ = false;
+  }
+
+  irq_ready_ = pending_irq_ && irq_detect_;
+  nmi_ready_ = pending_nmi_ && nmi_detect_;
   state_.cycle += step_cycles_;
   return step_cycles_;
 }
@@ -110,33 +135,32 @@ uint8_t M6502::debugStep(dbg::Debugger &debugger) {
     tick();
     --stall_cycles_;
   }
-  step_cycles_ = 0;
-  if (nmi_ready_) {
-    op_Interrupt(NMI_VEC, IntSource::INTLINE);
-    pending_nmi_ = false;
-  } else if (pending_reset_) {
-    op_Interrupt(RST_VEC,
-                 (force_reset_ ? IntSource::INSTRUCTION : IntSource::INTLINE));
-    pending_reset_ = false;
-    force_reset_ = false;
-  } else if (irq_ready_) {
-    op_Interrupt(IRQ_VEC, IntSource::INTLINE);
-  }
 
-  bool irq_b4 = pending_irq_;
-  bool nmi_b4 = pending_nmi_;
+  step_cycles_ = 0;
+  handleInterrupts();
 
   dispatch(debugger.step(
       [&]() {
         instr::Instruction in(readByte(state_.pc), state_.pc,
                               state_.cycle + step_cycles_);
+        pollIrq();
         in.address = calculateAddress(in);
         return in;
       }(),
       state_, mapper_));
 
-  irq_ready_ = pending_irq_ && irq_b4;
-  nmi_ready_ = pending_nmi_ && nmi_b4;
+  // If NMI was detected on the last cycle of the instruction,
+  // suppress detection (it's too late). Otherwise if detected
+  // suppress any detected IRQ as a side effect
+  if (nmi_detect_ && (nmi_detect_cycle_ == step_cycles_)) {
+    nmi_detect_ = false;
+    nmi_detect_cycle_ = 0;
+  } else if (nmi_detect_) {
+    irq_detect_ = false;
+  }
+
+  irq_ready_ = pending_irq_ && irq_detect_;
+  nmi_ready_ = pending_nmi_ && nmi_detect_;
   state_.cycle += step_cycles_;
   return step_cycles_;
 }
@@ -352,7 +376,8 @@ void M6502::dispatch(instr::Instruction const &in) {
     // AND with unindexed address
     // NOTE(oren): assuming that for the indirect indexed case the "target"
     // address refers to the address _stored_ at the zero-page pointer
-    // possible that this should be 00 + 1 (as in upper byte of zero page addr)
+    // possible that this should be 00 + 1 (as in upper byte of zero page
+    // addr)
     op_ANDV((((in.address - state_.rY) >> 8) & 0xFF) + 1);
     op_ST(in.address, state_.rA);
   } break;
@@ -443,6 +468,7 @@ void M6502::dispatch(instr::Instruction const &in) {
     break;
   case Operation::RTI:
     op_RTI();
+    pollIrq();
     break;
   case Operation::PHA:
     op_PHA();
@@ -511,22 +537,30 @@ void M6502::op_Interrupt(AddressT vec, IntSource src) {
   // INT_DISABLE cuases all non-NMI interrupts to be ignored
   // IntSource::INSTRUCTION indicates a BRK triggered interrupt,
   // which is non-maskable but targets the IRQ vector
-  if (vec != NMI_VEC && src != IntSource::INSTRUCTION &&
-      GET(state_.status, INT_DISABLE_M)) {
+  if (src == IntSource::INTLINE && GET(state_.status, INT_DISABLE_M)) {
     return;
   }
 
   // TODO(oren): gross hack to ensure exact return address is pushed onto the
   // stack
-  if (vec == IRQ_VEC && src == IntSource::INSTRUCTION) {
+  if (src == IntSource::INSTRUCTION) {
     ++state_.pc;
   }
+
   if (vec != RST_VEC) {
     AddressT returnAddr = state_.pc;
     DataT pc_hi = (returnAddr >> 8) & 0xFF;
     DataT pc_lo = returnAddr & 0xFF;
     op_PUSH(pc_hi); // tick 2
     op_PUSH(pc_lo); // tick 3
+
+    // Interrupt hijacking
+    // https://www.nesdev.org/wiki/CPU_interrupts#Interrupt_hijacking
+    // if (pending_nmi_) {
+    if (pending_nmi_) {
+      vec = NMI_VEC;
+      pending_nmi_ = false;
+    }
 
     DataT tmp = state_.status;
     SET(tmp, BIT5_M);
@@ -549,11 +583,13 @@ void M6502::op_Interrupt(AddressT vec, IntSource src) {
   AddressT target_hi = static_cast<AddressT>(readByte(vec + 1)); // tick 6
   AddressT target = (target_hi << 8) | target_lo;
   if (vec != RST_VEC) {
-    // TODO(oren): disable on NMI or just IRQ?
     disableInterrupts();
   } else if (rst_override_) {
     target = init_pc_;
   }
+  // TODO(oren): this feels like a big old hack...
+  nmi_detect_ = false;
+  irq_detect_ = false;
   op_JMP(target); // tick 7
 }
 

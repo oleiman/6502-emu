@@ -42,7 +42,8 @@ public:
   // TODO(oren): Callback hack is used only for EhBASIC, and I think
   // we can cover this use case with the memory mapper abstraction.
   using Callback = std::function<void(AddressT)>;
-  using TickHandler = std::function<void(void)>;
+  // TickHandlers return bool to indicate whether the irq line was driven active
+  using TickHandler = std::function<bool(void)>;
 
   explicit M6502(mem::Mapper &mapper, bool enable_bcd = true)
       : mapper_(mapper), enable_bcd_(enable_bcd) {}
@@ -64,21 +65,22 @@ public:
 
   void registerTickHandler(TickHandler f) { _tick_handlers.push_back(f); }
 
+  void pollNmi();
+  void pollIrq();
+
 private:
   enum class IntSource {
     INSTRUCTION = 0x00,
     INTLINE = 0x01,
+    INTLINE_FORCE = 0x02,
   };
   void tick() {
-    auto nmi_prev = pending_nmi_;
-    for (auto &h : _tick_handlers) {
-      h();
-    }
     ++step_cycles_;
-    if (!nmi_prev && pending_nmi_) {
-      nmi_cycle_ = state_.cycle + step_cycles_;
-    }
+    pending_irq_ = std::any_of(_tick_handlers.begin(), _tick_handlers.end(),
+                               [](auto h) { return h(); });
   }
+
+  void handleInterrupts();
 
   std::vector<TickHandler> _tick_handlers;
 
@@ -113,8 +115,12 @@ private:
   bool pending_reset_ = false;
   bool force_reset_ = false;
   bool pending_nmi_ = false;
+  bool nmi_detect_ = false;
+  uint8_t nmi_detect_cycle_ = 0;
   bool nmi_ready_ = false;
   bool pending_irq_ = false;
+  bool irq_detect_ = false;
+  uint8_t irq_detect_cycle_ = 0;
   bool irq_ready_ = false;
   unsigned long nmi_cycle_ = 0;
 
